@@ -70,6 +70,7 @@ const IMAGES = {
 export default function App() {
   const [showTransparenciaSub, setShowTransparenciaSub] = useState(false);
   const [showFinanceiraSub, setShowFinanceiraSub] = useState(false);
+  const [showCoslicSub, setShowCoslicSub] = useState(false);
   const [showInstitucionalSub, setShowInstitucionalSub] = useState(false);
   const [showLegislacaoSub, setShowLegislacaoSub] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
@@ -235,7 +236,20 @@ export default function App() {
         { label: 'BALANÇO FINANCEIRO', icon: FileText },
         { label: 'CONTRATAÇÃO DIRETA', icon: Handshake },
         { label: 'CONTRATOS E ADITIVOS', icon: FileSignature },
-        { label: 'COSLIC', icon: ClipboardList },
+        { 
+          label: 'COSLIC', 
+          icon: ClipboardList,
+          subItems: [
+            { label: 'AVISO', icon: FileText },
+            { label: 'COMUNICADO', icon: FileText },
+            { label: 'DISPENSA', icon: FileText },
+            { label: 'EDITAIS', icon: FileText },
+            { label: 'INEXIGIBILIDADE', icon: FileText },
+            { label: 'RESULTADO', icon: FileText },
+            { label: 'SÍNTESE', icon: FileText },
+            { label: 'ATA DE REGISTRO DE PREÇOS', icon: FileText }
+          ]
+        },
         { label: 'PLANO DE CONTRATAÇÃO ANUAL – PCA', icon: Calendar }
       ]
     },
@@ -326,13 +340,43 @@ export default function App() {
                                 className="overflow-hidden grid gap-1 pl-6 border-l border-primary/10 ml-4 mt-1"
                               >
                                 {item.subItems.map((sub) => (
-                                  <button 
-                                    key={sub.label}
-                                    className="flex items-center gap-3 p-2 rounded-lg hover:bg-primary/5 text-primary/70 text-[10px] font-bold transition-colors text-left"
-                                  >
-                                    <sub.icon className="w-3 h-3 opacity-60" />
-                                    {sub.label}
-                                  </button>
+                                  <div key={sub.label}>
+                                    <button 
+                                      onClick={() => sub.subItems && setShowCoslicSub(!showCoslicSub)}
+                                      className="flex items-center justify-between w-full p-2 rounded-lg hover:bg-primary/5 text-primary/70 text-[10px] font-bold transition-colors text-left"
+                                    >
+                                      <div className="flex items-center gap-3">
+                                        <sub.icon className="w-3 h-3 opacity-60" />
+                                        {sub.label}
+                                      </div>
+                                      {sub.subItems && (
+                                        <ChevronRight className={`w-3 h-3 transition-transform ${showCoslicSub ? 'rotate-90' : ''}`} />
+                                      )}
+                                    </button>
+                                    
+                                    {sub.subItems && (
+                                      <AnimatePresence>
+                                        {showCoslicSub && (
+                                          <motion.div 
+                                            initial={{ height: 0, opacity: 0 }}
+                                            animate={{ height: 'auto', opacity: 1 }}
+                                            exit={{ height: 0, opacity: 0 }}
+                                            className="overflow-hidden grid gap-1 pl-6 border-l border-primary/5 ml-2 mt-1"
+                                          >
+                                            {sub.subItems.map((subItem) => (
+                                              <button 
+                                                key={subItem.label}
+                                                className="flex items-center gap-2 p-1.5 rounded-md hover:bg-primary/5 text-primary/60 text-[9px] font-bold transition-colors text-left"
+                                              >
+                                                <subItem.icon className="w-2.5 h-2.5 opacity-50" />
+                                                {subItem.label}
+                                              </button>
+                                            ))}
+                                          </motion.div>
+                                        )}
+                                      </AnimatePresence>
+                                    )}
+                                  </div>
                                 ))}
                               </motion.div>
                             )}
@@ -582,13 +626,43 @@ export default function App() {
                                     className="overflow-hidden grid gap-1 pl-12 border-l border-primary/10 ml-4 mt-1"
                                   >
                                     {sub.subItems.map((item) => (
-                                      <button 
-                                        key={item.label}
-                                        className="flex items-center gap-3 p-2 rounded-lg hover:bg-primary/5 text-primary/70 text-[10px] font-bold transition-colors text-left"
-                                      >
-                                        <item.icon className="w-3 h-3 opacity-60" />
-                                        {item.label}
-                                      </button>
+                                      <div key={item.label}>
+                                        <button 
+                                          onClick={() => item.subItems && setShowCoslicSub(!showCoslicSub)}
+                                          className="flex items-center justify-between w-full p-2 rounded-lg hover:bg-primary/5 text-primary/70 text-[10px] font-bold transition-colors text-left"
+                                        >
+                                          <div className="flex items-center gap-3">
+                                            <item.icon className="w-3 h-3 opacity-60" />
+                                            {item.label}
+                                          </div>
+                                          {item.subItems && (
+                                            <ChevronRight className={`w-3 h-3 transition-transform ${showCoslicSub ? 'rotate-90' : ''}`} />
+                                          )}
+                                        </button>
+                                        
+                                        {item.subItems && (
+                                          <AnimatePresence>
+                                            {showCoslicSub && (
+                                              <motion.div 
+                                                initial={{ height: 0, opacity: 0 }}
+                                                animate={{ height: 'auto', opacity: 1 }}
+                                                exit={{ height: 0, opacity: 0 }}
+                                                className="overflow-hidden grid gap-1 pl-6 border-l border-primary/5 ml-2 mt-1"
+                                              >
+                                                {item.subItems.map((subItem) => (
+                                                  <button 
+                                                    key={subItem.label}
+                                                    className="flex items-center gap-2 p-1.5 rounded-md hover:bg-primary/5 text-primary/60 text-[9px] font-bold transition-colors text-left"
+                                                  >
+                                                    <subItem.icon className="w-2.5 h-2.5 opacity-50" />
+                                                    {subItem.label}
+                                                  </button>
+                                                ))}
+                                              </motion.div>
+                                            )}
+                                          </AnimatePresence>
+                                        )}
+                                      </div>
                                     ))}
                                   </motion.div>
                                 )}
