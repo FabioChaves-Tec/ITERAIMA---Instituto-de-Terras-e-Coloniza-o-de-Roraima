@@ -28,6 +28,7 @@ import {
   Users,
   X,
   UserRound,
+  Clock,
   UsersRound,
   Image,
   Scale,
@@ -40,6 +41,7 @@ import {
   Handshake,
   ClipboardList
 } from 'lucide-react';
+import { Toaster, toast } from 'sonner';
 import { motion, AnimatePresence } from 'motion/react';
 import { useState, useEffect, FormEvent } from 'react';
 
@@ -59,7 +61,8 @@ interface User {
 }
 
 const IMAGES = {
-  hero: 'https://images.unsplash.com/photo-1518709268805-4e9042af9f23?auto=format&fit=crop&q=80&w=1920',
+  logo: 'https://iteraimacidadao.rr.gov.br/cadastrousuarioexterno/include/images/marca/logo_iteraima.png',
+  hero: 'https://st2.depositphotos.com/1482106/12327/i/450/depositphotos_123270174-stock-photo-waving-flag-of-roraima-state.jpg',
   news1: 'https://images.unsplash.com/photo-1450101499163-c8848c66ca85?auto=format&fit=crop&q=80&w=800',
   news2: 'https://images.unsplash.com/photo-1500382017468-9049fed747ef?auto=format&fit=crop&q=80&w=800',
 };
@@ -144,6 +147,29 @@ export default function App() {
     setUser(null);
     localStorage.removeItem('token');
     localStorage.removeItem('user');
+  };
+
+  const handleShare = async () => {
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: 'ITERAIMA - Instituto de Terras e Colonização de Roraima',
+          text: 'Confira o portal do ITERAIMA!',
+          url: window.location.href,
+        });
+      } catch (error) {
+        if (error instanceof Error && error.name !== 'AbortError') {
+          toast.error('Erro ao compartilhar');
+        }
+      }
+    } else {
+      try {
+        await navigator.clipboard.writeText(window.location.href);
+        toast.success('Link copiado para a área de transferência!');
+      } catch (err) {
+        toast.error('Erro ao copiar link');
+      }
+    }
   };
 
   const handlePublish = async (e: FormEvent) => {
@@ -257,7 +283,12 @@ export default function App() {
               className="fixed top-0 left-0 h-full w-[280px] bg-white z-[70] shadow-2xl p-6 flex flex-col"
             >
               <div className="flex items-center justify-between mb-8">
-                <span className="text-xl font-black text-primary uppercase tracking-widest font-headline">MENU</span>
+                <img 
+                  src={IMAGES.logo} 
+                  alt="ITERAIMA Logo" 
+                  className="h-8 w-auto object-contain"
+                  referrerPolicy="no-referrer"
+                />
                 <button onClick={() => setIsSidebarOpen(false)} className="p-2 rounded-full hover:bg-primary/5">
                   <X className="text-primary w-6 h-6" />
                 </button>
@@ -443,7 +474,12 @@ export default function App() {
           className="flex items-center gap-3 active:scale-95 duration-200 cursor-pointer"
         >
           <Menu className="text-primary w-6 h-6" />
-          <span className="text-xl font-black text-primary uppercase tracking-[0.05em] font-headline">ITERAIMA</span>
+          <img 
+            src={IMAGES.logo} 
+            alt="ITERAIMA Logo" 
+            className="h-10 w-auto object-contain"
+            referrerPolicy="no-referrer"
+          />
         </div>
         <div className="flex items-center gap-4">
           <button className="p-2 rounded-full hover:bg-primary/5 transition-colors">
@@ -484,7 +520,7 @@ export default function App() {
                   Governo de Roraima
                 </span>
                 <h1 className="text-4xl font-extrabold text-white font-headline leading-tight tracking-tight mb-4">
-                  Terras e Colonização de Roraima
+                  Instituto de Terras e Colonização de Roraima
                 </h1>
                 <p className="text-white/80 text-sm leading-relaxed mb-6 max-w-md">
                   Trabalhando na regularização fundiária e no desenvolvimento sustentável do nosso estado, garantindo segurança jurídica ao produtor.
@@ -1025,20 +1061,42 @@ export default function App() {
         <div className="flex flex-col gap-4 mb-6">
           <div className="flex items-center justify-center gap-2 text-secondary">
             <MapPin className="w-4 h-4" />
-            <span className="text-xs">Rua General Penha Brasil, 1123, São Francisco - Boa Vista/RR</span>
+            <span className="text-xs">Av. Capitão Júlio Bezerra, 1861, Trinta e um de Março, CEP:69.305-294, Boa Vista/RR</span>
           </div>
           <div className="flex items-center justify-center gap-2 text-secondary">
             <Phone className="w-4 h-4" />
-            <span className="text-xs">(95) 2121-7700</span>
+            <span className="text-xs">(95) 98408-0403</span>
+          </div>
+          <div className="flex items-center justify-center gap-2 text-secondary">
+            <Clock className="w-4 h-4" />
+            <span className="text-xs">Horário de Funcionamento: 7:30 às 13:30</span>
+          </div>
+          <div className="flex items-center justify-center gap-2 text-secondary">
+            <Mail className="w-4 h-4" />
+            <span className="text-xs">E-mail: protoiteraima@gmail.com</span>
           </div>
         </div>
         
         <div className="flex gap-4 mb-8">
-          {[MapPin, Mail, Share2].map((Icon, i) => (
-            <div key={i} className="w-10 h-10 rounded-full border border-primary/10 flex items-center justify-center text-primary cursor-pointer hover:bg-primary hover:text-white transition-all">
-              <Icon className="w-5 h-5" />
-            </div>
-          ))}
+          {[
+            { Icon: MapPin, href: 'https://www.google.com/maps?cid=2222408489871394770&g_mp=CiVnb29nbGUubWFwcy5wbGFjZXMudjEuUGxhY2VzLkdldFBsYWNlEAEYASAB&hl=pt-BR&gl=BR&source=embed' },
+            { Icon: Mail, href: 'mailto:protoiteraima@gmail.com' },
+            { Icon: Share2, onClick: handleShare }
+          ].map(({ Icon, href, onClick }, i) => {
+            const Component = href ? 'a' : 'button';
+            return (
+              <Component 
+                key={i} 
+                href={href}
+                onClick={onClick}
+                target={href?.startsWith('http') ? "_blank" : undefined}
+                rel={href?.startsWith('http') ? "noopener noreferrer" : undefined}
+                className="w-10 h-10 rounded-full border border-primary/10 flex items-center justify-center text-primary cursor-pointer hover:bg-primary hover:text-white transition-all"
+              >
+                <Icon className="w-5 h-5" />
+              </Component>
+            );
+          })}
         </div>
 
         <button 
@@ -1049,7 +1107,14 @@ export default function App() {
           Voltar ao topo
         </button>
         
-        <p className="text-xs leading-relaxed text-secondary">© 2024 ITERAIMA - Governo do Estado de Roraima</p>
+        <img 
+          src={IMAGES.logo} 
+          alt="ITERAIMA Logo" 
+          className="h-12 w-auto object-contain mb-6 opacity-80"
+          referrerPolicy="no-referrer"
+        />
+        
+        <p className="text-xs leading-relaxed text-secondary">© 2026 ITERAIMA - Governo do Estado de Roraima</p>
         <div className="flex gap-4 mt-2">
           <a href="#" className="underline text-primary text-xs">Privacidade</a>
           <a href="#" className="text-secondary text-xs">Acessibilidade</a>
@@ -1089,6 +1154,7 @@ export default function App() {
           <span className="text-[11px] font-medium uppercase tracking-wider mt-1">Admin</span>
         </button>
       </nav>
+      <Toaster position="top-center" richColors />
     </div>
   );
 }

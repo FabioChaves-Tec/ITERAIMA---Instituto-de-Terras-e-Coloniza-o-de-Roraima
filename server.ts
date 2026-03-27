@@ -1,42 +1,56 @@
 import express from "express";
 import { createServer as createViteServer } from "vite";
 import path from "path";
-import Database from "better-sqlite3";
+import { Pool } from "pg";
 import jwt from "jsonwebtoken";
 import bcrypt from "bcryptjs";
 import cors from "cors";
+import dotenv from "dotenv";
 
-const db = new Database("database.sqlite");
+dotenv.config();
+
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL || "postgres://postgres:postgres@localhost:5432/iteraima"
+});
+
 const JWT_SECRET = process.env.JWT_SECRET || "iteraima-secret-key";
 
 // Initialize Database
-db.exec(`
-  CREATE TABLE IF NOT EXISTS users (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    email TEXT UNIQUE,
-    password TEXT,
-    role TEXT DEFAULT 'editor'
-  );
+const initDb = async () => {
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS users (
+        id SERIAL PRIMARY KEY,
+        email TEXT UNIQUE,
+        password TEXT,
+        role TEXT DEFAULT 'editor'
+      );
 
-  CREATE TABLE IF NOT EXISTS news (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    title TEXT,
-    content TEXT,
-    category TEXT,
-    image_url TEXT,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    author_id INTEGER,
-    FOREIGN KEY(author_id) REFERENCES users(id)
-  );
-`);
+      CREATE TABLE IF NOT EXISTS news (
+        id SERIAL PRIMARY KEY,
+        title TEXT,
+        content TEXT,
+        category TEXT,
+        image_url TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        author_id INTEGER REFERENCES users(id)
+      );
+    `);
 
-// Create default admin if not exists
-const adminEmail = "admin@iteraima.rr.gov.br";
-const existingAdmin = db.prepare("SELECT * FROM users WHERE email = ?").get(adminEmail);
-if (!existingAdmin) {
-  const hashedPassword = bcrypt.hashSync("admin123", 10);
-  db.prepare("INSERT INTO users (email, password, role) VALUES (?, ?, ?)").run(adminEmail, hashedPassword, "admin");
-}
+    // Create default admin if not exists
+    const adminEmail = "admin@iteraima.rr.gov.br";
+    const { rows: existingAdmin } = await pool.query("SELECT * FROM users WHERE email = $1", [adminEmail]);
+    if (existingAdmin.length === 0) {
+      const hashedPassword = bcrypt.hashSync("admin123", 10);
+      await pool.query("INSERT INTO users (email, password, role) VALUES ($1, $2, $3)", [adminEmail, hashedPassword, "admin"]);
+    }
+    console.log("Database initialized");
+  } catch (err) {
+    console.error("Error initializing database:", err);
+  }
+};
+
+initDb();
 
 async function startServer() {
   const app = express();
@@ -60,38 +74,53 @@ async function startServer() {
   };
 
   // API Routes
-  app.post("/api/login", (req, res) => {
+  app.post("/api/login", async (req, res) => {
     const { email, password } = req.body;
-    const user: any = db.prepare("SELECT * FROM users WHERE email = ?").get(email);
+    try {
+      const { rows } = await pool.query("SELECT * FROM users WHERE email = $1", [email]);
+      const user = rows[0];
 
-    if (user && bcrypt.compareSync(password, user.password)) {
-      const token = jwt.sign({ id: user.id, email: user.email, role: user.role }, JWT_SECRET);
-      res.json({ token, user: { email: user.email, role: user.role } });
-    } else {
-      res.status(401).json({ message: "Credenciais inválidas" });
+      if (user && bcrypt.compareSync(password, user.password)) {
+        const token = jwt.sign({ id: user.id, email: user.email, role: user.role }, JWT_SECRET);
+        res.json({ token, user: { email: user.email, role: user.role } });
+      } else {
+        res.status(401).json({ message: "Credenciais inválidas" });
+      }
+    } catch (err) {
+      res.status(500).json({ message: "Erro no servidor" });
     }
   });
 
-  app.get("/api/news", (req, res) => {
-    const news = db.prepare("SELECT * FROM news ORDER BY created_at DESC").all();
-    res.json(news);
+  app.get("/api/news", async (req, res) => {
+    try {
+      const { rows } = await pool.query("SELECT * FROM news ORDER BY created_at DESC");
+      res.json(rows);
+    } catch (err) {
+      res.status(500).json({ message: "Erro ao buscar notícias" });
+    }
   });
 
-  app.post("/api/news", authenticateToken, (req: any, res) => {
+  app.post("/api/news", authenticateToken, async (req: any, res) => {
     const { title, content, category, image_url } = req.body;
     try {
-      const result = db.prepare("INSERT INTO news (title, content, category, image_url, author_id) VALUES (?, ?, ?, ?, ?)")
-        .run(title, content, category, image_url, req.user.id);
-      res.json({ id: result.lastInsertRowid });
+      const { rows } = await pool.query(
+        "INSERT INTO news (title, content, category, image_url, author_id) VALUES ($1, $2, $3, $4, $5) RETURNING id",
+        [title, content, category, image_url, req.user.id]
+      );
+      res.json({ id: rows[0].id });
     } catch (error) {
       res.status(500).json({ message: "Erro ao publicar notícia" });
     }
   });
 
-  app.delete("/api/news/:id", authenticateToken, (req, res) => {
+  app.delete("/api/news/:id", authenticateToken, async (req, res) => {
     const { id } = req.params;
-    db.prepare("DELETE FROM news WHERE id = ?").run(id);
-    res.json({ message: "Notícia removida" });
+    try {
+      await pool.query("DELETE FROM news WHERE id = $1", [id]);
+      res.json({ message: "Notícia removida" });
+    } catch (err) {
+      res.status(500).json({ message: "Erro ao remover notícia" });
+    }
   });
 
   // Vite middleware for development
