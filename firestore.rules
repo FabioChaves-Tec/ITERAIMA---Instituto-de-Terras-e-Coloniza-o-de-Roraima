@@ -1,0 +1,129 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ===============================================================
+    // Assumed Data Model
+    // ===============================================================
+    //
+    // Collection: users
+    // Document ID: {uid}
+    // Fields:
+    //   - uid: string (required) - Firebase Auth UID
+    //   - email: string (required) - User email
+    //   - role: string (required, enum: admin, editor, viewer, pending) - User role
+    //   - status: string (required, enum: pending, approved, rejected) - Approval status
+    //   - createdAt: timestamp (required) - Account creation date
+    //
+    // Collection: news
+    // Document ID: {newsId}
+    // Fields:
+    //   - id: string (required)
+    //   - title: string (required)
+    //   - content: string (required)
+    //   - category: string (required)
+    //   - imageUrl: string (optional)
+    //   - createdAt: timestamp (required)
+    //   - authorUid: string (required)
+    //
+    // Collection: documents
+    // Document ID: {docId}
+    // Fields:
+    //   - id: string (required)
+    //   - name: string (required)
+    //   - category: string (required)
+    //   - year: string (required)
+    //   - url: string (required)
+    //   - uploadDate: timestamp (required)
+    //   - authorUid: string (required)
+    //
+    // ===============================================================
+
+    // Helper Functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(uid) {
+      return isAuthenticated() && request.auth.uid == uid;
+    }
+
+    function isAdmin() {
+      return isAuthenticated() && 
+        (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin' ||
+         (request.auth.token.email == "Fabio.freitas.chaves@gmail.com" && request.auth.token.email_verified == true));
+    }
+
+    function isEditor() {
+      return isAuthenticated() && 
+        (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'editor' || isAdmin());
+    }
+
+    function isApproved() {
+      return isAuthenticated() && 
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.status == 'approved';
+    }
+
+    // Domain Validators
+    function isValidUser(data) {
+      return data.keys().hasAll(['uid', 'email', 'role', 'status', 'createdAt']) &&
+             data.uid is string &&
+             data.email is string &&
+             data.role in ['admin', 'editor', 'viewer', 'pending'] &&
+             data.status in ['pending', 'approved', 'rejected'] &&
+             data.createdAt is timestamp;
+    }
+
+    function isValidNews(data) {
+      return data.keys().hasAll(['id', 'title', 'content', 'category', 'createdAt', 'authorUid']) &&
+             data.title is string && data.title.size() > 0 && data.title.size() < 200 &&
+             data.content is string && data.content.size() > 0 && data.content.size() < 10000 &&
+             data.category is string &&
+             data.createdAt is timestamp &&
+             data.authorUid is string;
+    }
+
+    function isValidDocument(data) {
+      return data.keys().hasAll(['id', 'name', 'category', 'year', 'url', 'uploadDate', 'authorUid']) &&
+             data.name is string && data.name.size() > 0 && data.name.size() < 255 &&
+             data.category is string &&
+             data.year is string &&
+             data.url is string &&
+             data.uploadDate is timestamp &&
+             data.authorUid is string;
+    }
+
+    // Rules
+    match /users/{uid} {
+      allow read: if isOwner(uid) || isAdmin();
+      
+      // Anyone can register as pending
+      allow create: if isAuthenticated() && 
+                      request.auth.uid == uid && 
+                      isValidUser(request.resource.data) &&
+                      request.resource.data.role == 'pending' &&
+                      request.resource.data.status == 'pending';
+      
+      // Only admin can update role/status. User can only update profile if approved.
+      allow update: if (isAdmin() && isValidUser(request.resource.data)) ||
+                      (isOwner(uid) && 
+                       isValidUser(request.resource.data) && 
+                       request.resource.data.role == resource.data.role && 
+                       request.resource.data.status == resource.data.status);
+    }
+
+    match /news/{newsId} {
+      allow read: if true;
+      allow create: if isEditor() && isApproved() && isValidNews(request.resource.data);
+      allow update: if isEditor() && isApproved() && isValidNews(request.resource.data);
+      allow delete: if isAdmin();
+    }
+
+    match /documents/{docId} {
+      allow read: if true;
+      allow create: if isEditor() && isApproved() && isValidDocument(request.resource.data);
+      allow update: if isEditor() && isApproved() && isValidDocument(request.resource.data);
+      allow delete: if isAdmin();
+    }
+  }
+}

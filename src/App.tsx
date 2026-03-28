@@ -39,25 +39,172 @@ import {
   LogOut,
   LogIn,
   Handshake,
-  ClipboardList
+  ClipboardList,
+  ArrowLeft,
+  Folder,
+  Upload,
+  File,
+  CheckCircle2,
+  Download,
+  ShieldCheck,
+  ShieldAlert,
+  UserPlus
 } from 'lucide-react';
 import { Toaster, toast } from 'sonner';
 import { motion, AnimatePresence } from 'motion/react';
-import { useState, useEffect, FormEvent } from 'react';
+import React, { useState, useEffect, FormEvent, Component, ErrorInfo, ReactNode } from 'react';
+import { 
+  signInWithEmailAndPassword, 
+  createUserWithEmailAndPassword, 
+  signOut, 
+  onAuthStateChanged,
+  User as FirebaseUser
+} from 'firebase/auth';
+import { 
+  collection, 
+  doc, 
+  setDoc, 
+  getDoc, 
+  getDocs, 
+  query, 
+  orderBy, 
+  onSnapshot,
+  updateDoc,
+  deleteDoc,
+  addDoc,
+  where,
+  serverTimestamp,
+  Timestamp,
+  getDocFromServer
+} from 'firebase/firestore';
+import { auth, db } from './firebase';
 
 interface News {
-  id: number;
+  id: string;
   title: string;
   content: string;
   category: string;
-  image_url: string;
-  created_at: string;
-  author_id: number;
+  imageUrl: string;
+  createdAt: any;
+  authorUid: string;
 }
 
 interface User {
+  uid: string;
   email: string;
-  role: string;
+  displayName?: string;
+  role: 'admin' | 'editor' | 'viewer' | 'pending';
+  status: 'pending' | 'approved' | 'rejected';
+  createdAt?: any;
+}
+
+interface TransparencyDocument {
+  id: string;
+  name: string;
+  category: string;
+  year: string;
+  url: string;
+  uploadDate: any;
+  authorUid: string;
+}
+
+// Error Handling Spec for Firestore Operations
+enum OperationType {
+  CREATE = 'create',
+  UPDATE = 'update',
+  DELETE = 'delete',
+  LIST = 'list',
+  GET = 'get',
+  WRITE = 'write',
+}
+
+interface FirestoreErrorInfo {
+  error: string;
+  operationType: OperationType;
+  path: string | null;
+  authInfo: {
+    userId: string | undefined;
+    email: string | null | undefined;
+    emailVerified: boolean | undefined;
+    isAnonymous: boolean | undefined;
+    tenantId: string | null | undefined;
+    providerInfo: {
+      providerId: string;
+      displayName: string | null;
+      email: string | null;
+      photoUrl: string | null;
+    }[];
+  }
+}
+
+function handleFirestoreError(error: unknown, operationType: OperationType, path: string | null) {
+  const errInfo: FirestoreErrorInfo = {
+    error: error instanceof Error ? error.message : String(error),
+    authInfo: {
+      userId: auth.currentUser?.uid,
+      email: auth.currentUser?.email,
+      emailVerified: auth.currentUser?.emailVerified,
+      isAnonymous: auth.currentUser?.isAnonymous,
+      tenantId: auth.currentUser?.tenantId,
+      providerInfo: auth.currentUser?.providerData.map(provider => ({
+        providerId: provider.providerId,
+        displayName: provider.displayName,
+        email: provider.email,
+        photoUrl: provider.photoURL
+      })) || []
+    },
+    operationType,
+    path
+  }
+  console.error('Firestore Error: ', JSON.stringify(errInfo));
+  throw new Error(JSON.stringify(errInfo));
+}
+
+// Error Boundary Component
+class ErrorBoundary extends Component<any, any> {
+  public state = { hasError: false, errorInfo: '' };
+
+  static getDerivedStateFromError(error: Error) {
+    return { hasError: true, errorInfo: error.message };
+  }
+
+  componentDidCatch(error: Error, errorInfo: ErrorInfo) {
+    console.error("Uncaught error:", error, errorInfo);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      let displayMessage = "Ocorreu um erro inesperado.";
+      try {
+        const parsed = JSON.parse(this.state.errorInfo);
+        if (parsed.error && parsed.error.includes('insufficient permissions')) {
+          displayMessage = "Você não tem permissão para realizar esta ação ou acessar estes dados.";
+        }
+      } catch (e) {
+        // Not JSON, use default
+      }
+
+      return (
+        <div className="min-h-screen flex items-center justify-center bg-surface-container-low p-6">
+          <div className="bg-white p-8 rounded-[2.5rem] shadow-xl border border-primary/5 max-w-md w-full text-center">
+            <div className="w-16 h-16 bg-red-50 rounded-3xl flex items-center justify-center text-red-500 mx-auto mb-6">
+              <ShieldAlert className="w-8 h-8" />
+            </div>
+            <h2 className="text-2xl font-black text-on-surface font-headline mb-2">Ops! Algo deu errado</h2>
+            <p className="text-sm text-secondary mb-8">{displayMessage}</p>
+            <button 
+              onClick={() => window.location.reload()}
+              className="w-full bg-primary text-white font-bold py-4 rounded-2xl shadow-lg shadow-primary/20 active:scale-95 transition-all"
+            >
+              TENTAR NOVAMENTE
+            </button>
+          </div>
+        </div>
+      );
+    }
+
+    return (this as any).props.children;
+  }
 }
 
 const IMAGES = {
@@ -67,28 +214,54 @@ const IMAGES = {
   news2: 'https://images.unsplash.com/photo-1500382017468-9049fed747ef?auto=format&fit=crop&q=80&w=800',
 };
 
+const transparencyCategories = [
+  'BALANÇO FINANCEIRO',
+  'CONTRATAÇÃO DIRETA',
+  'CONTRATOS E ADITIVOS',
+  'AVISO',
+  'COMUNICADO',
+  'DISPENSA',
+  'EDITAIS',
+  'INEXIGIBILIDADE',
+  'RESULTADO',
+  'SÍNTESE',
+  'ATA DE REGISTRO DE PREÇOS'
+];
+
 export default function App() {
   const [showTransparenciaSub, setShowTransparenciaSub] = useState(false);
-  const [showFinanceiraSub, setShowFinanceiraSub] = useState(false);
-  const [showCoslicSub, setShowCoslicSub] = useState(false);
+  const [openLevel2Menu, setOpenLevel2Menu] = useState<string | null>(null);
+  const [openLevel3Menu, setOpenLevel3Menu] = useState<string | null>(null);
+  const [openLevel4Menu, setOpenLevel4Menu] = useState<string | null>(null);
   const [showInstitucionalSub, setShowInstitucionalSub] = useState(false);
   const [showLegislacaoSub, setShowLegislacaoSub] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-  const [currentPage, setCurrentPage] = useState<'home' | 'news' | 'admin'>('home');
+  const [currentPage, setCurrentPage] = useState<'home' | 'news' | 'admin' | 'folder'>('home');
+  const [selectedFolder, setSelectedFolder] = useState<{ label: string, items: any[] } | null>(null);
+  const [selectedYear, setSelectedYear] = useState<string | null>(null);
   
   // News State
   const [newsList, setNewsList] = useState<News[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   
+  // Transparency Documents State
+  const [documents, setDocuments] = useState<TransparencyDocument[]>([]);
+  const [isUploadingDocs, setIsUploadingDocs] = useState(false);
+  const [uploadCategory, setUploadCategory] = useState('BALANÇO FINANCEIRO');
+  const [uploadYear, setUploadYear] = useState('2026');
+  const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
+  
   // Auth State
-  const [user, setUser] = useState<User | null>(() => {
-    const stored = localStorage.getItem('user');
-    return stored ? JSON.parse(stored) : null;
-  });
-  const [token, setToken] = useState<string | null>(localStorage.getItem('token'));
+  const [user, setUser] = useState<User | null>(null);
+  const [isAuthReady, setIsAuthReady] = useState(false);
   const [loginEmail, setLoginEmail] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
   const [loginError, setLoginError] = useState('');
+  const [isRegistering, setIsRegistering] = useState(false);
+  const [registerSuccess, setRegisterSuccess] = useState(false);
+
+  // Admin State
+  const [pendingUsers, setPendingUsers] = useState<User[]>([]);
 
   // Publish State
   const [newTitle, setNewTitle] = useState('');
@@ -100,54 +273,178 @@ export default function App() {
   const [publishError, setPublishError] = useState('');
 
   // Delete State
-  const [deletingId, setDeletingId] = useState<number | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   useEffect(() => {
-    fetchNews();
+    // Auth state listener
+    const unsubscribeAuth = onAuthStateChanged(auth, async (firebaseUser) => {
+      if (firebaseUser) {
+        try {
+          const userDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
+          if (userDoc.exists()) {
+            const userData = userDoc.data() as User;
+            if (userData.status === 'approved') {
+              setUser(userData);
+            } else {
+              await auth.signOut();
+              setUser(null);
+              if (userData.status === 'pending') {
+                setLoginError('Sua conta está aguardando aprovação de um administrador.');
+              } else {
+                setLoginError('Sua conta foi rejeitada ou desativada.');
+              }
+            }
+          }
+        } catch (error) {
+          console.error("Error fetching user data:", error);
+        }
+      } else {
+        setUser(null);
+      }
+      setIsAuthReady(true);
+    });
+
+    // Real-time news listener
+    const unsubscribeNews = onSnapshot(
+      query(collection(db, 'news'), orderBy('createdAt', 'desc')),
+      (snapshot) => {
+        const news = snapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        })) as News[];
+        setNewsList(news);
+        setIsLoading(false);
+      },
+      (error) => handleFirestoreError(error, OperationType.LIST, 'news')
+    );
+
+    // Real-time documents listener
+    const unsubscribeDocs = onSnapshot(
+      query(collection(db, 'documents'), orderBy('uploadDate', 'desc')),
+      (snapshot) => {
+        const docs = snapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        })) as TransparencyDocument[];
+        setDocuments(docs);
+      },
+      (error) => handleFirestoreError(error, OperationType.LIST, 'documents')
+    );
+
+    return () => {
+      unsubscribeAuth();
+      unsubscribeNews();
+      unsubscribeDocs();
+    };
   }, []);
 
-  const fetchNews = async () => {
-    try {
-      const response = await fetch('/api/news');
-      const data = await response.json();
-      setNewsList(data);
-    } catch (error) {
-      console.error('Error fetching news:', error);
-    } finally {
-      setIsLoading(false);
+  // Admin: Listen for pending users
+  useEffect(() => {
+    if (user?.role === 'admin') {
+      const unsubscribePending = onSnapshot(
+        query(collection(db, 'users'), where('status', '==', 'pending')),
+        (snapshot) => {
+          const pending = snapshot.docs.map(doc => ({
+            uid: doc.id,
+            ...doc.data()
+          })) as User[];
+          setPendingUsers(pending);
+        },
+        (error) => handleFirestoreError(error, OperationType.LIST, 'users')
+      );
+      return () => unsubscribePending();
     }
-  };
+  }, [user]);
 
   const handleLogin = async (e: FormEvent) => {
     e.preventDefault();
     setLoginError('');
     try {
-      const response = await fetch('/api/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: loginEmail, password: loginPassword })
-      });
-      const data = await response.json();
-      if (response.ok) {
-        setToken(data.token);
-        setUser(data.user);
-        localStorage.setItem('token', data.token);
-        localStorage.setItem('user', JSON.stringify(data.user));
+      const userCredential = await signInWithEmailAndPassword(auth, loginEmail, loginPassword);
+      const userDoc = await getDoc(doc(db, 'users', userCredential.user.uid));
+      
+      if (userDoc.exists()) {
+        const userData = userDoc.data() as User;
+        if (userData.status !== 'approved') {
+          await auth.signOut();
+          if (userData.status === 'pending') {
+            setLoginError('Sua conta está aguardando aprovação de um administrador.');
+          } else {
+            setLoginError('Sua conta foi rejeitada ou desativada.');
+          }
+          return;
+        }
+        setUser(userData);
         setLoginEmail('');
         setLoginPassword('');
-      } else {
-        setLoginError(data.message);
       }
-    } catch (error) {
-      setLoginError('Erro ao conectar ao servidor');
+    } catch (error: any) {
+      if (error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password') {
+        setLoginError('E-mail ou senha incorretos.');
+      } else if (error.code === 'auth/invalid-credential') {
+        setLoginError('Credenciais inválidas.');
+      } else {
+        setLoginError('Erro ao realizar login. Tente novamente.');
+      }
     }
   };
 
-  const handleLogout = () => {
-    setToken(null);
+  const handleRegister = async (e: FormEvent) => {
+    e.preventDefault();
+    setLoginError('');
+    try {
+      const userCredential = await createUserWithEmailAndPassword(auth, loginEmail, loginPassword);
+      const newUser: User = {
+        uid: userCredential.user.uid,
+        email: loginEmail,
+        role: 'pending',
+        status: 'pending',
+        displayName: loginEmail.split('@')[0]
+      };
+      
+      await setDoc(doc(db, 'users', userCredential.user.uid), newUser);
+      await auth.signOut();
+      
+      setRegisterSuccess(true);
+      setLoginEmail('');
+      setLoginPassword('');
+      setIsRegistering(false);
+      setTimeout(() => setRegisterSuccess(false), 5000);
+    } catch (error: any) {
+      if (error.code === 'auth/email-already-in-use') {
+        setLoginError('Este e-mail já está em uso.');
+      } else {
+        setLoginError('Erro ao realizar cadastro. Tente novamente.');
+      }
+    }
+  };
+
+  const handleLogout = async () => {
+    await auth.signOut();
     setUser(null);
-    localStorage.removeItem('token');
-    localStorage.removeItem('user');
+  };
+
+  const handleApproveUser = async (uid: string, role: 'admin' | 'editor' | 'viewer') => {
+    try {
+      await updateDoc(doc(db, 'users', uid), {
+        status: 'approved',
+        role: role
+      });
+      toast.success('Usuário aprovado com sucesso!');
+    } catch (error) {
+      handleFirestoreError(error, OperationType.UPDATE, `users/${uid}`);
+    }
+  };
+
+  const handleRejectUser = async (uid: string) => {
+    try {
+      await updateDoc(doc(db, 'users', uid), {
+        status: 'rejected'
+      });
+      toast.success('Solicitação rejeitada.');
+    } catch (error) {
+      handleFirestoreError(error, OperationType.UPDATE, `users/${uid}`);
+    }
   };
 
   const handleShare = async () => {
@@ -175,52 +472,73 @@ export default function App() {
 
   const handlePublish = async (e: FormEvent) => {
     e.preventDefault();
+    if (!user) return;
+    
     setIsPublishing(true);
     setPublishError('');
     setPublishSuccess(false);
     try {
-      const response = await fetch('/api/news', {
-        method: 'POST',
-        headers: { 
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({ 
-          title: newTitle, 
-          content: newContent, 
-          category: newCategory, 
-          image_url: newImageUrl 
-        })
-      });
-      if (response.ok) {
-        setNewTitle('');
-        setNewContent('');
-        setNewImageUrl('');
-        setPublishSuccess(true);
-        fetchNews();
-        setTimeout(() => setPublishSuccess(false), 3000);
-      } else {
-        setPublishError('Erro ao publicar notícia. Verifique sua conexão.');
-      }
+      const newsData = {
+        title: newTitle,
+        content: newContent,
+        category: newCategory,
+        imageUrl: newImageUrl,
+        createdAt: serverTimestamp(),
+        authorUid: user.uid
+      };
+      
+      await addDoc(collection(db, 'news'), newsData);
+      
+      setNewTitle('');
+      setNewContent('');
+      setNewImageUrl('');
+      setPublishSuccess(true);
+      setTimeout(() => setPublishSuccess(false), 3000);
     } catch (error) {
-      setPublishError('Erro ao conectar ao servidor');
+      setPublishError('Erro ao publicar notícia. Verifique sua conexão.');
+      handleFirestoreError(error, OperationType.CREATE, 'news');
     } finally {
       setIsPublishing(false);
     }
   };
 
-  const handleDeleteNews = async (id: number) => {
+  const handleDeleteNews = async (id: string) => {
     try {
-      const response = await fetch(`/api/news/${id}`, {
-        method: 'DELETE',
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
-      if (response.ok) {
-        fetchNews();
-        setDeletingId(null);
-      }
+      await deleteDoc(doc(db, 'news', id));
+      setDeletingId(null);
+      toast.success('Notícia excluída com sucesso!');
     } catch (error) {
-      // Silently fail or show error in UI
+      handleFirestoreError(error, OperationType.DELETE, `news/${id}`);
+    }
+  };
+
+  const handleUploadDocs = async () => {
+    if (selectedFiles.length === 0 || !user) return;
+    
+    setIsUploadingDocs(true);
+    
+    try {
+      for (const file of selectedFiles) {
+        // In a real app, we would upload to Firebase Storage here
+        // For now, we'll store the metadata in Firestore with a placeholder URL
+        const docData = {
+          name: file.name,
+          category: uploadCategory,
+          year: uploadYear,
+          url: '#', // Placeholder for Storage URL
+          uploadDate: serverTimestamp(),
+          authorUid: user.uid
+        };
+        
+        await addDoc(collection(db, 'documents'), docData);
+      }
+      
+      setIsUploadingDocs(false);
+      setSelectedFiles([]);
+      toast.success(`${selectedFiles.length} documentos enviados com sucesso!`);
+    } catch (error) {
+      setIsUploadingDocs(false);
+      handleFirestoreError(error, OperationType.CREATE, 'documents');
     }
   };
 
@@ -233,28 +551,167 @@ export default function App() {
       label: 'FINANCEIRA', 
       icon: CircleDollarSign,
       subItems: [
-        { label: 'BALANÇO FINANCEIRO', icon: FileText },
-        { label: 'CONTRATAÇÃO DIRETA', icon: Handshake },
-        { label: 'CONTRATOS E ADITIVOS', icon: FileSignature },
+        { 
+          label: 'BALANÇO FINANCEIRO', 
+          icon: FileText,
+          subItems: [
+            { label: '2022', icon: Calendar },
+            { label: '2023', icon: Calendar },
+            { label: '2024', icon: Calendar },
+            { label: '2025', icon: Calendar },
+            { label: '2026', icon: Calendar }
+          ]
+        },
+        { 
+          label: 'CONTRATAÇÃO DIRETA', 
+          icon: Handshake,
+          subItems: [
+            { label: '2022', icon: Calendar },
+            { label: '2023', icon: Calendar },
+            { label: '2024', icon: Calendar },
+            { label: '2025', icon: Calendar },
+            { label: '2026', icon: Calendar }
+          ]
+        },
+        { 
+          label: 'CONTRATOS E ADITIVOS', 
+          icon: FileSignature,
+          subItems: [
+            { label: '2022', icon: Calendar },
+            { label: '2023', icon: Calendar },
+            { label: '2024', icon: Calendar },
+            { label: '2025', icon: Calendar },
+            { label: '2026', icon: Calendar }
+          ]
+        },
         { 
           label: 'COSLIC', 
           icon: ClipboardList,
           subItems: [
-            { label: 'AVISO', icon: FileText },
-            { label: 'COMUNICADO', icon: FileText },
-            { label: 'DISPENSA', icon: FileText },
-            { label: 'EDITAIS', icon: FileText },
-            { label: 'INEXIGIBILIDADE', icon: FileText },
-            { label: 'RESULTADO', icon: FileText },
-            { label: 'SÍNTESE', icon: FileText },
-            { label: 'ATA DE REGISTRO DE PREÇOS', icon: FileText }
+            { 
+              label: 'AVISO', 
+              icon: FileText,
+              subItems: [
+                { label: '2022', icon: Calendar },
+                { label: '2023', icon: Calendar },
+                { label: '2024', icon: Calendar },
+                { label: '2025', icon: Calendar },
+                { label: '2026', icon: Calendar }
+              ]
+            },
+            { 
+              label: 'COMUNICADO', 
+              icon: FileText,
+              subItems: [
+                { label: '2022', icon: Calendar },
+                { label: '2023', icon: Calendar },
+                { label: '2024', icon: Calendar },
+                { label: '2025', icon: Calendar },
+                { label: '2026', icon: Calendar }
+              ]
+            },
+            { 
+              label: 'DISPENSA', 
+              icon: FileText,
+              subItems: [
+                { label: '2022', icon: Calendar },
+                { label: '2023', icon: Calendar },
+                { label: '2024', icon: Calendar },
+                { label: '2025', icon: Calendar },
+                { label: '2026', icon: Calendar }
+              ]
+            },
+            { 
+              label: 'EDITAIS', 
+              icon: FileText,
+              subItems: [
+                { label: '2022', icon: Calendar },
+                { label: '2023', icon: Calendar },
+                { label: '2024', icon: Calendar },
+                { label: '2025', icon: Calendar },
+                { label: '2026', icon: Calendar }
+              ]
+            },
+            { 
+              label: 'INEXIGIBILIDADE', 
+              icon: FileText,
+              subItems: [
+                { label: '2022', icon: Calendar },
+                { label: '2023', icon: Calendar },
+                { label: '2024', icon: Calendar },
+                { label: '2025', icon: Calendar },
+                { label: '2026', icon: Calendar }
+              ]
+            },
+            { 
+              label: 'RESULTADO', 
+              icon: FileText,
+              subItems: [
+                { label: '2022', icon: Calendar },
+                { label: '2023', icon: Calendar },
+                { label: '2024', icon: Calendar },
+                { label: '2025', icon: Calendar },
+                { label: '2026', icon: Calendar }
+              ]
+            },
+            { 
+              label: 'SÍNTESE', 
+              icon: FileText,
+              subItems: [
+                { label: '2022', icon: Calendar },
+                { label: '2023', icon: Calendar },
+                { label: '2024', icon: Calendar },
+                { label: '2025', icon: Calendar },
+                { label: '2026', icon: Calendar }
+              ]
+            },
+            { 
+              label: 'ATA DE REGISTRO DE PREÇOS', 
+              icon: FileText,
+              subItems: [
+                { label: '2022', icon: Calendar },
+                { label: '2023', icon: Calendar },
+                { label: '2024', icon: Calendar },
+                { label: '2025', icon: Calendar },
+                { label: '2026', icon: Calendar }
+              ]
+            }
           ]
         },
-        { label: 'PLANO DE CONTRATAÇÃO ANUAL – PCA', icon: Calendar }
+        { 
+          label: 'PLANO DE CONTRATAÇÃO ANUAL – PCA', 
+          icon: Calendar,
+          subItems: [
+            { label: '2022', icon: Calendar },
+            { label: '2023', icon: Calendar },
+            { label: '2024', icon: Calendar },
+            { label: '2025', icon: Calendar },
+            { label: '2026', icon: Calendar }
+          ]
+        }
       ]
     },
-    { label: 'FUNDIÁRIA', icon: Map },
-    { label: 'DE PESSOAS', icon: Users }
+    { 
+      label: 'FUNDIÁRIA', 
+      icon: Map,
+      subItems: [
+        { label: 'IMÓVEIS', icon: Home },
+        { label: 'REGULARIZADOS', icon: FileSignature },
+        { label: 'NOTIFICAÇÕES', icon: Rss },
+        { label: 'REQUERIMENTO DE REGULARIZAÇÃO', icon: ClipboardList }
+      ]
+    },
+    { 
+      label: 'DE PESSOAS', 
+      icon: Users,
+      subItems: [
+        { label: 'CONCURSOS E SELEÇÕES', icon: UsersRound },
+        { label: 'DIÁRIAS', icon: CircleDollarSign },
+        { label: 'ESTAGIÁRIOS', icon: UserRound },
+        { label: 'FOLHA DE PAGAMENTO', icon: FileText },
+        { label: 'TERCEIRIZADOS', icon: Handshake }
+      ]
+    }
   ];
 
   const governoLinks = [
@@ -318,7 +775,16 @@ export default function App() {
                     {transparenciaItems.map((item) => (
                       <div key={item.label}>
                         <button 
-                          onClick={() => item.subItems && setShowFinanceiraSub(!showFinanceiraSub)}
+                          onClick={() => {
+                            if (item.subItems) {
+                              const isOpening = openLevel2Menu !== item.label;
+                              setOpenLevel2Menu(isOpening ? item.label : null);
+                              if (!isOpening) {
+                                setOpenLevel3Menu(null);
+                                setOpenLevel4Menu(null);
+                              }
+                            }
+                          }}
                           className="flex items-center justify-between w-full p-3 rounded-xl hover:bg-primary/5 text-primary text-xs font-bold transition-colors text-left"
                         >
                           <div className="flex items-center gap-3">
@@ -326,13 +792,13 @@ export default function App() {
                             {item.label}
                           </div>
                           {item.subItems && (
-                            <ChevronRight className={`w-4 h-4 transition-transform ${showFinanceiraSub ? 'rotate-90' : ''}`} />
+                            <ChevronRight className={`w-4 h-4 transition-transform ${openLevel2Menu === item.label ? 'rotate-90' : ''}`} />
                           )}
                         </button>
                         
                         {item.subItems && (
                           <AnimatePresence>
-                            {showFinanceiraSub && (
+                            {openLevel2Menu === item.label && (
                               <motion.div 
                                 initial={{ height: 0, opacity: 0 }}
                                 animate={{ height: 'auto', opacity: 1 }}
@@ -342,7 +808,21 @@ export default function App() {
                                 {item.subItems.map((sub) => (
                                   <div key={sub.label}>
                                     <button 
-                                      onClick={() => sub.subItems && setShowCoslicSub(!showCoslicSub)}
+                                      onClick={() => {
+                                        if (sub.subItems) {
+                                          if (sub.subItems.some(i => i.label === '2022')) {
+                                            setSelectedFolder({ label: sub.label, items: sub.subItems });
+                                            setCurrentPage('folder');
+                                            setIsSidebarOpen(false);
+                                          } else {
+                                            const isOpening = openLevel3Menu !== sub.label;
+                                            setOpenLevel3Menu(isOpening ? sub.label : null);
+                                            if (!isOpening) {
+                                              setOpenLevel4Menu(null);
+                                            }
+                                          }
+                                        }
+                                      }}
                                       className="flex items-center justify-between w-full p-2 rounded-lg hover:bg-primary/5 text-primary/70 text-[10px] font-bold transition-colors text-left"
                                     >
                                       <div className="flex items-center gap-3">
@@ -350,13 +830,13 @@ export default function App() {
                                         {sub.label}
                                       </div>
                                       {sub.subItems && (
-                                        <ChevronRight className={`w-3 h-3 transition-transform ${showCoslicSub ? 'rotate-90' : ''}`} />
+                                        <ChevronRight className={`w-3 h-3 transition-transform ${openLevel3Menu === sub.label ? 'rotate-90' : ''}`} />
                                       )}
                                     </button>
                                     
                                     {sub.subItems && (
                                       <AnimatePresence>
-                                        {showCoslicSub && (
+                                        {openLevel3Menu === sub.label && (
                                           <motion.div 
                                             initial={{ height: 0, opacity: 0 }}
                                             animate={{ height: 'auto', opacity: 1 }}
@@ -364,13 +844,53 @@ export default function App() {
                                             className="overflow-hidden grid gap-1 pl-6 border-l border-primary/5 ml-2 mt-1"
                                           >
                                             {sub.subItems.map((subItem) => (
-                                              <button 
-                                                key={subItem.label}
-                                                className="flex items-center gap-2 p-1.5 rounded-md hover:bg-primary/5 text-primary/60 text-[9px] font-bold transition-colors text-left"
-                                              >
-                                                <subItem.icon className="w-2.5 h-2.5 opacity-50" />
-                                                {subItem.label}
-                                              </button>
+                                              <div key={subItem.label}>
+                                                <button 
+                                                  onClick={() => {
+                                                    if (subItem.subItems) {
+                                                      if (subItem.subItems.some(i => i.label === '2022')) {
+                                                        setSelectedFolder({ label: subItem.label, items: subItem.subItems });
+                                                        setCurrentPage('folder');
+                                                        setIsSidebarOpen(false);
+                                                      } else {
+                                                        setOpenLevel4Menu(openLevel4Menu === subItem.label ? null : subItem.label);
+                                                      }
+                                                    }
+                                                  }}
+                                                  className="flex items-center justify-between w-full p-1.5 rounded-md hover:bg-primary/5 text-primary/60 text-[9px] font-bold transition-colors text-left"
+                                                >
+                                                  <div className="flex items-center gap-2">
+                                                    <subItem.icon className="w-2.5 h-2.5 opacity-50" />
+                                                    {subItem.label}
+                                                  </div>
+                                                  {subItem.subItems && (
+                                                    <ChevronRight className={`w-2.5 h-2.5 transition-transform ${openLevel4Menu === subItem.label ? 'rotate-90' : ''}`} />
+                                                  )}
+                                                </button>
+
+                                                {subItem.subItems && (
+                                                  <AnimatePresence>
+                                                    {openLevel4Menu === subItem.label && (
+                                                      <motion.div 
+                                                        initial={{ height: 0, opacity: 0 }}
+                                                        animate={{ height: 'auto', opacity: 1 }}
+                                                        exit={{ height: 0, opacity: 0 }}
+                                                        className="overflow-hidden grid gap-1 pl-4 border-l border-primary/5 ml-2 mt-1"
+                                                      >
+                                                        {subItem.subItems.map((leaf) => (
+                                                          <button 
+                                                            key={leaf.label}
+                                                            className="flex items-center gap-2 p-1 rounded-md hover:bg-primary/5 text-primary/50 text-[8px] font-bold transition-colors text-left"
+                                                          >
+                                                            <leaf.icon className="w-2 h-2 opacity-40" />
+                                                            {leaf.label}
+                                                          </button>
+                                                        ))}
+                                                      </motion.div>
+                                                    )}
+                                                  </AnimatePresence>
+                                                )}
+                                              </div>
                                             ))}
                                           </motion.div>
                                         )}
@@ -602,7 +1122,16 @@ export default function App() {
                         {transparenciaItems.map((sub) => (
                           <div key={sub.label}>
                             <button 
-                              onClick={() => sub.subItems && setShowFinanceiraSub(!showFinanceiraSub)}
+                              onClick={() => {
+                                if (sub.subItems) {
+                                  const isOpening = openLevel2Menu !== sub.label;
+                                  setOpenLevel2Menu(isOpening ? sub.label : null);
+                                  if (!isOpening) {
+                                    setOpenLevel3Menu(null);
+                                    setOpenLevel4Menu(null);
+                                  }
+                                }
+                              }}
                               className="flex items-center justify-between w-full p-3 rounded-2xl hover:bg-primary/5 text-primary text-xs font-bold transition-colors text-left"
                             >
                               <div className="flex items-center gap-3">
@@ -612,13 +1141,13 @@ export default function App() {
                                 {sub.label}
                               </div>
                               {sub.subItems && (
-                                <ChevronRight className={`w-4 h-4 transition-transform ${showFinanceiraSub ? 'rotate-90' : ''}`} />
+                                <ChevronRight className={`w-4 h-4 transition-transform ${openLevel2Menu === sub.label ? 'rotate-90' : ''}`} />
                               )}
                             </button>
                             
                             {sub.subItems && (
                               <AnimatePresence>
-                                {showFinanceiraSub && (
+                                {openLevel2Menu === sub.label && (
                                   <motion.div 
                                     initial={{ height: 0, opacity: 0 }}
                                     animate={{ height: 'auto', opacity: 1 }}
@@ -628,7 +1157,21 @@ export default function App() {
                                     {sub.subItems.map((item) => (
                                       <div key={item.label}>
                                         <button 
-                                          onClick={() => item.subItems && setShowCoslicSub(!showCoslicSub)}
+                                          onClick={() => {
+                                            if (item.subItems) {
+                                              if (item.subItems.some(i => i.label === '2022')) {
+                                                setSelectedFolder({ label: item.label, items: item.subItems });
+                                                setCurrentPage('folder');
+                                                setShowTransparenciaSub(false);
+                                              } else {
+                                                const isOpening = openLevel3Menu !== item.label;
+                                                setOpenLevel3Menu(isOpening ? item.label : null);
+                                                if (!isOpening) {
+                                                  setOpenLevel4Menu(null);
+                                                }
+                                              }
+                                            }
+                                          }}
                                           className="flex items-center justify-between w-full p-2 rounded-lg hover:bg-primary/5 text-primary/70 text-[10px] font-bold transition-colors text-left"
                                         >
                                           <div className="flex items-center gap-3">
@@ -636,13 +1179,13 @@ export default function App() {
                                             {item.label}
                                           </div>
                                           {item.subItems && (
-                                            <ChevronRight className={`w-3 h-3 transition-transform ${showCoslicSub ? 'rotate-90' : ''}`} />
+                                            <ChevronRight className={`w-3 h-3 transition-transform ${openLevel3Menu === item.label ? 'rotate-90' : ''}`} />
                                           )}
                                         </button>
                                         
                                         {item.subItems && (
                                           <AnimatePresence>
-                                            {showCoslicSub && (
+                                            {openLevel3Menu === item.label && (
                                               <motion.div 
                                                 initial={{ height: 0, opacity: 0 }}
                                                 animate={{ height: 'auto', opacity: 1 }}
@@ -650,13 +1193,53 @@ export default function App() {
                                                 className="overflow-hidden grid gap-1 pl-6 border-l border-primary/5 ml-2 mt-1"
                                               >
                                                 {item.subItems.map((subItem) => (
-                                                  <button 
-                                                    key={subItem.label}
-                                                    className="flex items-center gap-2 p-1.5 rounded-md hover:bg-primary/5 text-primary/60 text-[9px] font-bold transition-colors text-left"
-                                                  >
-                                                    <subItem.icon className="w-2.5 h-2.5 opacity-50" />
-                                                    {subItem.label}
-                                                  </button>
+                                                  <div key={subItem.label}>
+                                                    <button 
+                                                      onClick={() => {
+                                                        if (subItem.subItems) {
+                                                          if (subItem.subItems.some(i => i.label === '2022')) {
+                                                            setSelectedFolder({ label: subItem.label, items: subItem.subItems });
+                                                            setCurrentPage('folder');
+                                                            setShowTransparenciaSub(false);
+                                                          } else {
+                                                            setOpenLevel4Menu(openLevel4Menu === subItem.label ? null : subItem.label);
+                                                          }
+                                                        }
+                                                      }}
+                                                      className="flex items-center justify-between w-full p-1.5 rounded-md hover:bg-primary/5 text-primary/60 text-[9px] font-bold transition-colors text-left"
+                                                    >
+                                                      <div className="flex items-center gap-2">
+                                                        <subItem.icon className="w-2.5 h-2.5 opacity-50" />
+                                                        {subItem.label}
+                                                      </div>
+                                                      {subItem.subItems && (
+                                                        <ChevronRight className={`w-2.5 h-2.5 transition-transform ${openLevel4Menu === subItem.label ? 'rotate-90' : ''}`} />
+                                                      )}
+                                                    </button>
+
+                                                    {subItem.subItems && (
+                                                      <AnimatePresence>
+                                                        {openLevel4Menu === subItem.label && (
+                                                          <motion.div 
+                                                            initial={{ height: 0, opacity: 0 }}
+                                                            animate={{ height: 'auto', opacity: 1 }}
+                                                            exit={{ height: 0, opacity: 0 }}
+                                                            className="overflow-hidden grid gap-1 pl-4 border-l border-primary/5 ml-2 mt-1"
+                                                          >
+                                                            {subItem.subItems.map((leaf) => (
+                                                              <button 
+                                                                key={leaf.label}
+                                                                className="flex items-center gap-2 p-1 rounded-md hover:bg-primary/5 text-primary/50 text-[8px] font-bold transition-colors text-left"
+                                                              >
+                                                                <leaf.icon className="w-2 h-2 opacity-40" />
+                                                                {leaf.label}
+                                                              </button>
+                                                            ))}
+                                                          </motion.div>
+                                                        )}
+                                                      </AnimatePresence>
+                                                    )}
+                                                  </div>
                                                 ))}
                                               </motion.div>
                                             )}
@@ -881,7 +1464,7 @@ export default function App() {
                   <article key={news.id} className="bg-white rounded-3xl overflow-hidden shadow-sm border border-primary/5 group">
                     <div className="relative aspect-[16/9]">
                       <img 
-                        src={news.image_url || IMAGES.news1} 
+                        src={news.imageUrl || IMAGES.news1} 
                         alt={news.title}
                         className="w-full h-full object-cover"
                         referrerPolicy="no-referrer"
@@ -896,7 +1479,11 @@ export default function App() {
                       <div className="flex items-center justify-between mb-3">
                         <div className="flex items-center gap-2 text-[10px] text-secondary font-medium uppercase tracking-wider">
                           <Calendar className="w-3 h-3" />
-                          <span>{new Date(news.created_at).toLocaleDateString('pt-BR')}</span>
+                          <span>
+                            {news.createdAt instanceof Timestamp 
+                              ? news.createdAt.toDate().toLocaleDateString('pt-BR') 
+                              : 'Recentemente'}
+                          </span>
                         </div>
                         {user && (user.role === 'admin' || user.role === 'editor') && (
                           <div className="flex items-center gap-2">
@@ -947,23 +1534,135 @@ export default function App() {
           </motion.div>
         )}
 
+        {currentPage === 'folder' && selectedFolder && (
+          <motion.div
+            initial={{ opacity: 0, x: 20 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: -20 }}
+            className="px-6 py-8 min-h-[60vh]"
+          >
+            <div className="flex items-center gap-4 mb-8">
+              <button 
+                onClick={() => {
+                  if (selectedYear) {
+                    setSelectedYear(null);
+                  } else {
+                    setCurrentPage('home');
+                    setSelectedFolder(null);
+                  }
+                }}
+                className="p-3 rounded-2xl bg-primary/10 text-primary hover:bg-primary/20 transition-all active:scale-90"
+              >
+                <ArrowLeft className="w-6 h-6" />
+              </button>
+              <div>
+                <span className="text-primary font-bold text-xs uppercase tracking-[0.2em]">Transparência</span>
+                <h2 className="text-3xl font-black text-on-surface font-headline leading-none mt-1">{selectedFolder.label}</h2>
+              </div>
+            </div>
+
+            {!selectedYear ? (
+              <div className="grid grid-cols-2 gap-4">
+                {selectedFolder.items.map((item) => (
+                  <motion.div
+                    key={item.label}
+                    onClick={() => setSelectedYear(item.label)}
+                    whileHover={{ y: -4 }}
+                    whileTap={{ scale: 0.95 }}
+                    className="bg-white p-8 rounded-[2.5rem] shadow-[0_8px_32px_rgba(0,34,2,0.06)] border border-primary/5 flex flex-col items-center justify-center text-center gap-4 cursor-pointer group hover:border-primary/20 transition-all"
+                  >
+                    <div className="w-16 h-16 bg-primary/5 rounded-3xl flex items-center justify-center text-primary group-hover:bg-primary/10 transition-colors">
+                      <Folder className="w-8 h-8" />
+                    </div>
+                    <span className="font-headline font-bold text-primary text-sm uppercase tracking-wider">{item.label}</span>
+                  </motion.div>
+                ))}
+              </div>
+            ) : (
+              <div className="space-y-6">
+                <div className="flex items-center justify-between mb-4">
+                  <span className="bg-primary/10 text-primary px-4 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-wider">
+                    Ano: {selectedYear}
+                  </span>
+                </div>
+
+                <div className="grid gap-3">
+                  {documents
+                    .filter(doc => doc.category === selectedFolder.label && doc.year === selectedYear)
+                    .map(doc => (
+                      <div key={doc.id} className="bg-white p-4 rounded-2xl border border-primary/5 flex items-center justify-between group hover:border-primary/20 transition-all shadow-sm">
+                        <div className="flex items-center gap-4">
+                          <div className="w-10 h-10 bg-primary/5 rounded-xl flex items-center justify-center text-primary">
+                            <File className="w-5 h-5" />
+                          </div>
+                          <div>
+                            <span className="block text-sm font-bold text-primary truncate max-w-[200px]">{doc.name}</span>
+                            <span className="text-[10px] text-secondary font-medium uppercase tracking-wider">
+                              PDF • {doc.uploadDate instanceof Timestamp 
+                                ? doc.uploadDate.toDate().toLocaleDateString('pt-BR') 
+                                : 'Recentemente'}
+                            </span>
+                          </div>
+                        </div>
+                        <a 
+                          href={doc.url} 
+                          target="_blank" 
+                          rel="noopener noreferrer"
+                          className="p-2 text-primary hover:bg-primary/5 rounded-full transition-all"
+                        >
+                          <Download className="w-5 h-5" />
+                        </a>
+                      </div>
+                    ))}
+                  {documents.filter(doc => doc.category === selectedFolder.label && doc.year === selectedYear).length === 0 && (
+                    <div className="text-center py-12 bg-surface-container-low rounded-3xl border border-dashed border-primary/20">
+                      <File className="w-12 h-12 mx-auto mb-4 opacity-10 text-primary" />
+                      <p className="text-xs text-secondary font-medium">Nenhum documento encontrado para este período.</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            <div className="mt-12 p-6 bg-primary/5 rounded-3xl border border-primary/10">
+              <div className="flex items-center gap-3 text-primary mb-2">
+                <HelpCircle className="w-5 h-5" />
+                <span className="font-bold text-sm uppercase tracking-wider">Informação</span>
+              </div>
+              <p className="text-xs text-secondary leading-relaxed">
+                Selecione o ano desejado para acessar os documentos e relatórios correspondentes à categoria <strong>{selectedFolder.label}</strong>.
+              </p>
+            </div>
+          </motion.div>
+        )}
+
         {currentPage === 'admin' && (
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             className="px-6 py-8"
           >
-            {!token ? (
+            {!isAuthReady ? (
+              <div className="flex items-center justify-center py-20">
+                <div className="w-12 h-12 border-4 border-primary/20 border-t-primary rounded-full animate-spin" />
+              </div>
+            ) : !user ? (
               <div className="max-w-md mx-auto bg-white p-8 rounded-3xl shadow-xl border border-primary/5">
                 <div className="text-center mb-8">
                   <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-4 text-primary">
-                    <LogIn className="w-8 h-8" />
+                    {isRegistering ? <UserPlus className="w-8 h-8" /> : <LogIn className="w-8 h-8" />}
                   </div>
-                  <h2 className="text-2xl font-black text-primary uppercase tracking-wider font-headline">Acesso Restrito</h2>
-                  <p className="text-xs text-secondary mt-2">Somente usuários autorizados podem publicar notícias.</p>
+                  <h2 className="text-2xl font-black text-primary uppercase tracking-wider font-headline">
+                    {isRegistering ? 'Criar Conta' : 'Acesso Restrito'}
+                  </h2>
+                  <p className="text-xs text-secondary mt-2">
+                    {isRegistering 
+                      ? 'Cadastre-se para solicitar acesso ao painel administrativo.' 
+                      : 'Somente usuários autorizados podem publicar notícias.'}
+                  </p>
                 </div>
 
-                <form onSubmit={handleLogin} className="space-y-4">
+                <form onSubmit={isRegistering ? handleRegister : handleLogin} className="space-y-4">
                   <div>
                     <label className="block text-[10px] font-bold text-secondary uppercase tracking-widest mb-1.5 ml-1">E-mail</label>
                     <input 
@@ -986,15 +1685,36 @@ export default function App() {
                       required
                     />
                   </div>
+                  
                   {loginError && (
                     <p className="text-red-500 text-xs font-bold text-center">{loginError}</p>
                   )}
+                  
+                  {registerSuccess && (
+                    <p className="text-green-600 text-xs font-bold text-center bg-green-50 p-3 rounded-xl border border-green-100">
+                      Cadastro realizado! Aguarde a aprovação de um administrador.
+                    </p>
+                  )}
+
                   <button 
                     type="submit"
                     className="w-full bg-primary text-white font-bold py-4 rounded-2xl shadow-lg shadow-primary/20 active:scale-95 transition-all mt-4"
                   >
-                    ENTRAR
+                    {isRegistering ? 'SOLICITAR ACESSO' : 'ENTRAR'}
                   </button>
+
+                  <div className="text-center mt-6">
+                    <button 
+                      type="button"
+                      onClick={() => {
+                        setIsRegistering(!isRegistering);
+                        setLoginError('');
+                      }}
+                      className="text-[10px] font-bold text-primary uppercase tracking-widest hover:underline"
+                    >
+                      {isRegistering ? 'JÁ TENHO CONTA (ENTRAR)' : 'NÃO TEM CONTA? CADASTRE-SE AGORA'}
+                    </button>
+                  </div>
                 </form>
               </div>
             ) : (
@@ -1103,6 +1823,170 @@ export default function App() {
                     </motion.div>
                   )}
                 </form>
+
+                {/* User Management Section - Admin Only */}
+                {user?.role === 'admin' && pendingUsers.length > 0 && (
+                  <div className="mt-12 pt-12 border-t border-primary/10">
+                    <div className="flex items-center gap-4 mb-8">
+                      <div className="w-12 h-12 bg-primary/10 rounded-2xl flex items-center justify-center text-primary">
+                        <UserPlus className="w-6 h-6" />
+                      </div>
+                      <div>
+                        <h2 className="text-2xl font-black text-on-surface font-headline leading-none">Aprovação de Usuários</h2>
+                        <p className="text-xs text-secondary mt-1">Gerencie novos cadastros e atribua funções</p>
+                      </div>
+                    </div>
+
+                    <div className="grid gap-4">
+                      {pendingUsers.map(pendingUser => (
+                        <div key={pendingUser.uid} className="bg-white p-6 rounded-3xl border border-primary/5 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-6">
+                          <div>
+                            <span className="block text-sm font-bold text-primary">{pendingUser.email}</span>
+                            <span className="text-[10px] text-secondary font-medium uppercase tracking-wider">
+                              Solicitado em: {pendingUser.createdAt instanceof Timestamp ? pendingUser.createdAt.toDate().toLocaleDateString('pt-BR') : 'Recentemente'}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <button 
+                              onClick={() => handleApproveUser(pendingUser.uid, 'viewer')}
+                              className="px-4 py-2 bg-surface-container-low text-primary text-[10px] font-bold rounded-xl hover:bg-primary/10 transition-all uppercase tracking-widest"
+                            >
+                              Viewer
+                            </button>
+                            <button 
+                              onClick={() => handleApproveUser(pendingUser.uid, 'editor')}
+                              className="px-4 py-2 bg-primary/10 text-primary text-[10px] font-bold rounded-xl hover:bg-primary/20 transition-all uppercase tracking-widest"
+                            >
+                              Editor
+                            </button>
+                            <button 
+                              onClick={() => handleApproveUser(pendingUser.uid, 'admin')}
+                              className="px-4 py-2 bg-primary text-white text-[10px] font-bold rounded-xl hover:opacity-90 transition-all uppercase tracking-widest"
+                            >
+                              Admin
+                            </button>
+                            <button 
+                              onClick={() => handleRejectUser(pendingUser.uid)}
+                              className="p-2 text-red-500 hover:bg-red-50 rounded-xl transition-all"
+                            >
+                              <X className="w-5 h-5" />
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Document Upload Section - Admin/Editor Only */}
+                {(user?.role === 'admin' || user?.role === 'editor') && (
+                  <div className="mt-12 pt-12 border-t border-primary/10">
+                    <div className="flex items-center gap-4 mb-8">
+                      <div className="w-12 h-12 bg-primary/10 rounded-2xl flex items-center justify-center text-primary">
+                        <Upload className="w-6 h-6" />
+                      </div>
+                      <div>
+                        <h2 className="text-2xl font-black text-on-surface font-headline leading-none">Upload de Documentos</h2>
+                        <p className="text-xs text-secondary mt-1">Adicione novos arquivos ao portal da transparência</p>
+                      </div>
+                    </div>
+                    <div className="bg-white p-8 rounded-3xl shadow-xl border border-primary/5 space-y-6">
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <label className="block text-[10px] font-bold text-secondary uppercase tracking-widest mb-1.5 ml-1">Categoria</label>
+                          <select 
+                            value={uploadCategory}
+                            onChange={(e) => setUploadCategory(e.target.value)}
+                            className="w-full bg-surface-container-low border-none rounded-2xl px-4 py-3 text-sm focus:ring-2 focus:ring-primary transition-all"
+                          >
+                            {transparencyCategories.map(cat => (
+                              <option key={cat} value={cat}>{cat}</option>
+                            ))}
+                          </select>
+                        </div>
+                        <div>
+                          <label className="block text-[10px] font-bold text-secondary uppercase tracking-widest mb-1.5 ml-1">Ano</label>
+                          <select 
+                            value={uploadYear}
+                            onChange={(e) => setUploadYear(e.target.value)}
+                            className="w-full bg-surface-container-low border-none rounded-2xl px-4 py-3 text-sm focus:ring-2 focus:ring-primary transition-all"
+                          >
+                            {['2022', '2023', '2024', '2025', '2026'].map(y => (
+                              <option key={y} value={y}>{y}</option>
+                            ))}
+                          </select>
+                        </div>
+                      </div>
+
+                      <div className="relative">
+                        <input 
+                          type="file" 
+                          multiple 
+                          accept=".pdf"
+                          onChange={(e) => {
+                            const files = Array.from(e.target.files || []);
+                            if (files.length > 10) {
+                              toast.error('Máximo de 10 arquivos por vez');
+                              setSelectedFiles(files.slice(0, 10));
+                            } else {
+                              setSelectedFiles(files);
+                            }
+                          }}
+                          className="hidden" 
+                          id="pdf-upload"
+                        />
+                        <label 
+                          htmlFor="pdf-upload"
+                          className="w-full border-2 border-dashed border-primary/20 rounded-3xl p-8 flex flex-col items-center justify-center gap-3 cursor-pointer hover:bg-primary/5 transition-all group"
+                        >
+                          <div className="w-14 h-14 bg-primary/5 rounded-full flex items-center justify-center text-primary group-hover:scale-110 transition-transform">
+                            <Upload className="w-7 h-7" />
+                          </div>
+                          <div className="text-center">
+                            <span className="block text-sm font-bold text-primary">Clique para selecionar PDFs</span>
+                            <span className="text-[10px] text-secondary font-medium uppercase tracking-wider">Até 10 arquivos simultâneos</span>
+                          </div>
+                        </label>
+                      </div>
+
+                      {selectedFiles.length > 0 && (
+                        <div className="space-y-2">
+                          <div className="flex items-center justify-between px-2">
+                            <span className="text-[10px] font-bold text-secondary uppercase tracking-widest">Arquivos Selecionados ({selectedFiles.length})</span>
+                            <button onClick={() => setSelectedFiles([])} className="text-[10px] font-bold text-red-500 uppercase tracking-widest">Limpar</button>
+                          </div>
+                          <div className="grid gap-2">
+                            {selectedFiles.map((file, i) => (
+                              <div key={i} className="flex items-center gap-3 p-3 bg-surface-container-low rounded-xl border border-primary/5">
+                                <File className="w-4 h-4 text-primary opacity-60" />
+                                <span className="text-xs font-medium text-primary truncate flex-1">{file.name}</span>
+                                <CheckCircle2 className="w-4 h-4 text-green-500" />
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      <button 
+                        onClick={handleUploadDocs}
+                        disabled={isUploadingDocs || selectedFiles.length === 0}
+                        className={`w-full ${isUploadingDocs || selectedFiles.length === 0 ? 'bg-gray-400' : 'bg-primary'} text-white font-bold py-4 rounded-2xl shadow-lg shadow-primary/20 active:scale-95 transition-all flex items-center justify-center gap-2`}
+                      >
+                        {isUploadingDocs ? (
+                          <>
+                            <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                            ENVIANDO...
+                          </>
+                        ) : (
+                          <>
+                            <Upload className="w-5 h-5" />
+                            ENVIAR DOCUMENTOS
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
           </motion.div>
@@ -1198,7 +2082,11 @@ export default function App() {
       {/* BottomNavBar */}
       <nav className="fixed bottom-0 left-0 w-full z-50 flex justify-around items-center px-4 h-20 bg-background/80 backdrop-blur-xl rounded-t-[1.5rem] border-t border-primary/10 shadow-[0_-8px_32px_rgba(0,34,2,0.06)]">
         <button 
-          onClick={() => setCurrentPage('home')}
+          onClick={() => {
+            setCurrentPage('home');
+            setSelectedFolder(null);
+            setSelectedYear(null);
+          }}
           className={`flex flex-col items-center justify-center rounded-2xl px-4 py-1.5 active:scale-90 duration-150 transition-all ${currentPage === 'home' ? 'bg-primary text-white' : 'text-secondary hover:text-primary'}`}
         >
           <Home className="w-6 h-6" />
