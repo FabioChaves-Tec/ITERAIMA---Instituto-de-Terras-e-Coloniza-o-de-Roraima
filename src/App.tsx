@@ -53,112 +53,7 @@ import {
 import { Toaster, toast } from 'sonner';
 import { motion, AnimatePresence } from 'motion/react';
 import React, { useState, useEffect, FormEvent, Component, ErrorInfo, ReactNode } from 'react';
-import { 
-  signInWithEmailAndPassword, 
-  createUserWithEmailAndPassword, 
-  signOut, 
-  onAuthStateChanged,
-  User as FirebaseUser
-} from 'firebase/auth';
-import { 
-  collection, 
-  doc, 
-  setDoc, 
-  getDoc, 
-  getDocs, 
-  query, 
-  orderBy, 
-  onSnapshot,
-  updateDoc,
-  deleteDoc,
-  addDoc,
-  where,
-  serverTimestamp,
-  Timestamp,
-  getDocFromServer
-} from 'firebase/firestore';
-import { auth, db } from './firebase';
-
-interface News {
-  id: string;
-  title: string;
-  content: string;
-  category: string;
-  imageUrl: string;
-  createdAt: any;
-  authorUid: string;
-}
-
-interface User {
-  uid: string;
-  email: string;
-  displayName?: string;
-  role: 'admin' | 'editor' | 'viewer' | 'pending';
-  status: 'pending' | 'approved' | 'rejected';
-  createdAt?: any;
-}
-
-interface TransparencyDocument {
-  id: string;
-  name: string;
-  category: string;
-  year: string;
-  url: string;
-  uploadDate: any;
-  authorUid: string;
-}
-
-// Error Handling Spec for Firestore Operations
-enum OperationType {
-  CREATE = 'create',
-  UPDATE = 'update',
-  DELETE = 'delete',
-  LIST = 'list',
-  GET = 'get',
-  WRITE = 'write',
-}
-
-interface FirestoreErrorInfo {
-  error: string;
-  operationType: OperationType;
-  path: string | null;
-  authInfo: {
-    userId: string | undefined;
-    email: string | null | undefined;
-    emailVerified: boolean | undefined;
-    isAnonymous: boolean | undefined;
-    tenantId: string | null | undefined;
-    providerInfo: {
-      providerId: string;
-      displayName: string | null;
-      email: string | null;
-      photoUrl: string | null;
-    }[];
-  }
-}
-
-function handleFirestoreError(error: unknown, operationType: OperationType, path: string | null) {
-  const errInfo: FirestoreErrorInfo = {
-    error: error instanceof Error ? error.message : String(error),
-    authInfo: {
-      userId: auth.currentUser?.uid,
-      email: auth.currentUser?.email,
-      emailVerified: auth.currentUser?.emailVerified,
-      isAnonymous: auth.currentUser?.isAnonymous,
-      tenantId: auth.currentUser?.tenantId,
-      providerInfo: auth.currentUser?.providerData.map(provider => ({
-        providerId: provider.providerId,
-        displayName: provider.displayName,
-        email: provider.email,
-        photoUrl: provider.photoURL
-      })) || []
-    },
-    operationType,
-    path
-  }
-  console.error('Firestore Error: ', JSON.stringify(errInfo));
-  throw new Error(JSON.stringify(errInfo));
-}
+import { api, User, News, TransparencyDocument } from './api';
 
 // Error Boundary Component
 class ErrorBoundary extends Component<any, any> {
@@ -174,16 +69,6 @@ class ErrorBoundary extends Component<any, any> {
 
   render() {
     if (this.state.hasError) {
-      let displayMessage = "Ocorreu um erro inesperado.";
-      try {
-        const parsed = JSON.parse(this.state.errorInfo);
-        if (parsed.error && parsed.error.includes('insufficient permissions')) {
-          displayMessage = "Você não tem permissão para realizar esta ação ou acessar estes dados.";
-        }
-      } catch (e) {
-        // Not JSON, use default
-      }
-
       return (
         <div className="min-h-screen flex items-center justify-center bg-surface-container-low p-6">
           <div className="bg-white p-8 rounded-[2.5rem] shadow-xl border border-primary/5 max-w-md w-full text-center">
@@ -191,7 +76,7 @@ class ErrorBoundary extends Component<any, any> {
               <ShieldAlert className="w-8 h-8" />
             </div>
             <h2 className="text-2xl font-black text-on-surface font-headline mb-2">Ops! Algo deu errado</h2>
-            <p className="text-sm text-secondary mb-8">{displayMessage}</p>
+            <p className="text-sm text-secondary mb-8">{this.state.errorInfo}</p>
             <button 
               onClick={() => window.location.reload()}
               className="w-full bg-primary text-white font-bold py-4 rounded-2xl shadow-lg shadow-primary/20 active:scale-95 transition-all"
@@ -276,83 +161,51 @@ export default function App() {
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
   useEffect(() => {
-    // Auth state listener
-    const unsubscribeAuth = onAuthStateChanged(auth, async (firebaseUser) => {
-      if (firebaseUser) {
-        try {
-          const userDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
-          if (userDoc.exists()) {
-            const userData = userDoc.data() as User;
-            if (userData.status === 'approved') {
-              setUser(userData);
-            } else {
-              await auth.signOut();
-              setUser(null);
-              if (userData.status === 'pending') {
-                setLoginError('Sua conta está aguardando aprovação de um administrador.');
-              } else {
-                setLoginError('Sua conta foi rejeitada ou desativada.');
-              }
-            }
-          }
-        } catch (error) {
-          console.error("Error fetching user data:", error);
-        }
-      } else {
-        setUser(null);
-      }
-      setIsAuthReady(true);
-    });
+    // Auth state from localStorage
+    const savedUser = localStorage.getItem('user');
+    const token = localStorage.getItem('token');
+    if (savedUser && token) {
+      setUser(JSON.parse(savedUser));
+    }
+    setIsAuthReady(true);
 
-    // Real-time news listener
-    const unsubscribeNews = onSnapshot(
-      query(collection(db, 'news'), orderBy('createdAt', 'desc')),
-      (snapshot) => {
-        const news = snapshot.docs.map(doc => ({
-          id: doc.id,
-          ...doc.data()
-        })) as News[];
+    // Initial data fetch
+    const fetchData = async () => {
+      try {
+        const [news, docs] = await Promise.all([
+          api.getNews(),
+          api.getDocuments()
+        ]);
         setNewsList(news);
-        setIsLoading(false);
-      },
-      (error) => handleFirestoreError(error, OperationType.LIST, 'news')
-    );
-
-    // Real-time documents listener
-    const unsubscribeDocs = onSnapshot(
-      query(collection(db, 'documents'), orderBy('uploadDate', 'desc')),
-      (snapshot) => {
-        const docs = snapshot.docs.map(doc => ({
-          id: doc.id,
-          ...doc.data()
-        })) as TransparencyDocument[];
         setDocuments(docs);
-      },
-      (error) => handleFirestoreError(error, OperationType.LIST, 'documents')
-    );
-
-    return () => {
-      unsubscribeAuth();
-      unsubscribeNews();
-      unsubscribeDocs();
+      } catch (error) {
+        console.error("Error fetching initial data:", error);
+      } finally {
+        setIsLoading(false);
+      }
     };
+
+    fetchData();
+
+    // Poll for updates (simplified replacement for onSnapshot)
+    const interval = setInterval(fetchData, 30000);
+    return () => clearInterval(interval);
   }, []);
 
-  // Admin: Listen for pending users
+  // Admin: Fetch pending users
   useEffect(() => {
     if (user?.role === 'admin') {
-      const unsubscribePending = onSnapshot(
-        query(collection(db, 'users'), where('status', '==', 'pending')),
-        (snapshot) => {
-          const pending = snapshot.docs.map(doc => ({
-            uid: doc.id,
-            ...doc.data()
-          })) as User[];
+      const fetchPending = async () => {
+        try {
+          const pending = await api.getPendingUsers();
           setPendingUsers(pending);
-        },
-        (error) => handleFirestoreError(error, OperationType.LIST, 'users')
-      );
-      return () => unsubscribePending();
+        } catch (error) {
+          console.error("Error fetching pending users:", error);
+        }
+      };
+      fetchPending();
+      const interval = setInterval(fetchPending, 30000);
+      return () => clearInterval(interval);
     }
   }, [user]);
 
@@ -360,32 +213,14 @@ export default function App() {
     e.preventDefault();
     setLoginError('');
     try {
-      const userCredential = await signInWithEmailAndPassword(auth, loginEmail, loginPassword);
-      const userDoc = await getDoc(doc(db, 'users', userCredential.user.uid));
-      
-      if (userDoc.exists()) {
-        const userData = userDoc.data() as User;
-        if (userData.status !== 'approved') {
-          await auth.signOut();
-          if (userData.status === 'pending') {
-            setLoginError('Sua conta está aguardando aprovação de um administrador.');
-          } else {
-            setLoginError('Sua conta foi rejeitada ou desativada.');
-          }
-          return;
-        }
-        setUser(userData);
-        setLoginEmail('');
-        setLoginPassword('');
-      }
+      const data = await api.login(loginEmail, loginPassword);
+      localStorage.setItem('token', data.token);
+      localStorage.setItem('user', JSON.stringify(data.user));
+      setUser(data.user);
+      setLoginEmail('');
+      setLoginPassword('');
     } catch (error: any) {
-      if (error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password') {
-        setLoginError('E-mail ou senha incorretos.');
-      } else if (error.code === 'auth/invalid-credential') {
-        setLoginError('Credenciais inválidas.');
-      } else {
-        setLoginError('Erro ao realizar login. Tente novamente.');
-      }
+      setLoginError(error.message);
     }
   };
 
@@ -393,57 +228,40 @@ export default function App() {
     e.preventDefault();
     setLoginError('');
     try {
-      const userCredential = await createUserWithEmailAndPassword(auth, loginEmail, loginPassword);
-      const newUser: User = {
-        uid: userCredential.user.uid,
-        email: loginEmail,
-        role: 'pending',
-        status: 'pending',
-        displayName: loginEmail.split('@')[0]
-      };
-      
-      await setDoc(doc(db, 'users', userCredential.user.uid), newUser);
-      await auth.signOut();
-      
+      await api.register(loginEmail, loginPassword);
       setRegisterSuccess(true);
       setLoginEmail('');
       setLoginPassword('');
       setIsRegistering(false);
       setTimeout(() => setRegisterSuccess(false), 5000);
     } catch (error: any) {
-      if (error.code === 'auth/email-already-in-use') {
-        setLoginError('Este e-mail já está em uso.');
-      } else {
-        setLoginError('Erro ao realizar cadastro. Tente novamente.');
-      }
+      setLoginError(error.message);
     }
   };
 
   const handleLogout = async () => {
-    await auth.signOut();
+    localStorage.removeItem('token');
+    localStorage.removeItem('user');
     setUser(null);
   };
 
-  const handleApproveUser = async (uid: string, role: 'admin' | 'editor' | 'viewer') => {
+  const handleApproveUser = async (id: number, role: 'admin' | 'editor' | 'viewer') => {
     try {
-      await updateDoc(doc(db, 'users', uid), {
-        status: 'approved',
-        role: role
-      });
+      await api.approveUser(id, role);
+      setPendingUsers(prev => prev.filter(u => u.id !== id));
       toast.success('Usuário aprovado com sucesso!');
     } catch (error) {
-      handleFirestoreError(error, OperationType.UPDATE, `users/${uid}`);
+      toast.error('Erro ao aprovar usuário');
     }
   };
 
-  const handleRejectUser = async (uid: string) => {
+  const handleRejectUser = async (id: number) => {
     try {
-      await updateDoc(doc(db, 'users', uid), {
-        status: 'rejected'
-      });
+      await api.rejectUser(id);
+      setPendingUsers(prev => prev.filter(u => u.id !== id));
       toast.success('Solicitação rejeitada.');
     } catch (error) {
-      handleFirestoreError(error, OperationType.UPDATE, `users/${uid}`);
+      toast.error('Erro ao rejeitar usuário');
     }
   };
 
@@ -478,37 +296,38 @@ export default function App() {
     setPublishError('');
     setPublishSuccess(false);
     try {
-      const newsData = {
+      await api.publishNews({
         title: newTitle,
         content: newContent,
         category: newCategory,
-        imageUrl: newImageUrl,
-        createdAt: serverTimestamp(),
-        authorUid: user.uid
-      };
-      
-      await addDoc(collection(db, 'news'), newsData);
+        image_url: newImageUrl
+      });
       
       setNewTitle('');
       setNewContent('');
       setNewImageUrl('');
       setPublishSuccess(true);
+      
+      // Refresh news
+      const news = await api.getNews();
+      setNewsList(news);
+      
       setTimeout(() => setPublishSuccess(false), 3000);
     } catch (error) {
       setPublishError('Erro ao publicar notícia. Verifique sua conexão.');
-      handleFirestoreError(error, OperationType.CREATE, 'news');
     } finally {
       setIsPublishing(false);
     }
   };
 
-  const handleDeleteNews = async (id: string) => {
+  const handleDeleteNews = async (id: any) => {
     try {
-      await deleteDoc(doc(db, 'news', id));
+      await api.deleteNews(id);
+      setNewsList(prev => prev.filter(n => n.id !== id));
       setDeletingId(null);
       toast.success('Notícia excluída com sucesso!');
     } catch (error) {
-      handleFirestoreError(error, OperationType.DELETE, `news/${id}`);
+      toast.error('Erro ao excluir notícia');
     }
   };
 
@@ -519,26 +338,24 @@ export default function App() {
     
     try {
       for (const file of selectedFiles) {
-        // In a real app, we would upload to Firebase Storage here
-        // For now, we'll store the metadata in Firestore with a placeholder URL
-        const docData = {
+        await api.uploadDocument({
           name: file.name,
           category: uploadCategory,
           year: uploadYear,
-          url: '#', // Placeholder for Storage URL
-          uploadDate: serverTimestamp(),
-          authorUid: user.uid
-        };
-        
-        await addDoc(collection(db, 'documents'), docData);
+          url: '#' // Placeholder
+        });
       }
+      
+      // Refresh docs
+      const docs = await api.getDocuments();
+      setDocuments(docs);
       
       setIsUploadingDocs(false);
       setSelectedFiles([]);
       toast.success(`${selectedFiles.length} documentos enviados com sucesso!`);
     } catch (error) {
       setIsUploadingDocs(false);
-      handleFirestoreError(error, OperationType.CREATE, 'documents');
+      toast.error('Erro ao enviar documentos');
     }
   };
 
@@ -1464,7 +1281,7 @@ export default function App() {
                   <article key={news.id} className="bg-white rounded-3xl overflow-hidden shadow-sm border border-primary/5 group">
                     <div className="relative aspect-[16/9]">
                       <img 
-                        src={news.imageUrl || IMAGES.news1} 
+                        src={news.image_url || IMAGES.news1} 
                         alt={news.title}
                         className="w-full h-full object-cover"
                         referrerPolicy="no-referrer"
@@ -1480,9 +1297,7 @@ export default function App() {
                         <div className="flex items-center gap-2 text-[10px] text-secondary font-medium uppercase tracking-wider">
                           <Calendar className="w-3 h-3" />
                           <span>
-                            {news.createdAt instanceof Timestamp 
-                              ? news.createdAt.toDate().toLocaleDateString('pt-BR') 
-                              : 'Recentemente'}
+                            {new Date(news.created_at).toLocaleDateString('pt-BR')}
                           </span>
                         </div>
                         {user && (user.role === 'admin' || user.role === 'editor') && (
@@ -1598,9 +1413,7 @@ export default function App() {
                           <div>
                             <span className="block text-sm font-bold text-primary truncate max-w-[200px]">{doc.name}</span>
                             <span className="text-[10px] text-secondary font-medium uppercase tracking-wider">
-                              PDF • {doc.uploadDate instanceof Timestamp 
-                                ? doc.uploadDate.toDate().toLocaleDateString('pt-BR') 
-                                : 'Recentemente'}
+                              PDF • {new Date(doc.upload_date).toLocaleDateString('pt-BR')}
                             </span>
                           </div>
                         </div>
@@ -1839,34 +1652,34 @@ export default function App() {
 
                     <div className="grid gap-4">
                       {pendingUsers.map(pendingUser => (
-                        <div key={pendingUser.uid} className="bg-white p-6 rounded-3xl border border-primary/5 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-6">
+                        <div key={pendingUser.id} className="bg-white p-6 rounded-3xl border border-primary/5 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-6">
                           <div>
                             <span className="block text-sm font-bold text-primary">{pendingUser.email}</span>
                             <span className="text-[10px] text-secondary font-medium uppercase tracking-wider">
-                              Solicitado em: {pendingUser.createdAt instanceof Timestamp ? pendingUser.createdAt.toDate().toLocaleDateString('pt-BR') : 'Recentemente'}
+                              Solicitado em: {pendingUser.created_at ? new Date(pendingUser.created_at).toLocaleDateString('pt-BR') : 'Recentemente'}
                             </span>
                           </div>
                           <div className="flex items-center gap-2">
                             <button 
-                              onClick={() => handleApproveUser(pendingUser.uid, 'viewer')}
+                              onClick={() => handleApproveUser(pendingUser.id, 'viewer')}
                               className="px-4 py-2 bg-surface-container-low text-primary text-[10px] font-bold rounded-xl hover:bg-primary/10 transition-all uppercase tracking-widest"
                             >
                               Viewer
                             </button>
                             <button 
-                              onClick={() => handleApproveUser(pendingUser.uid, 'editor')}
+                              onClick={() => handleApproveUser(pendingUser.id, 'editor')}
                               className="px-4 py-2 bg-primary/10 text-primary text-[10px] font-bold rounded-xl hover:bg-primary/20 transition-all uppercase tracking-widest"
                             >
                               Editor
                             </button>
                             <button 
-                              onClick={() => handleApproveUser(pendingUser.uid, 'admin')}
+                              onClick={() => handleApproveUser(pendingUser.id, 'admin')}
                               className="px-4 py-2 bg-primary text-white text-[10px] font-bold rounded-xl hover:opacity-90 transition-all uppercase tracking-widest"
                             >
                               Admin
                             </button>
                             <button 
-                              onClick={() => handleRejectUser(pendingUser.uid)}
+                              onClick={() => handleRejectUser(pendingUser.id)}
                               className="p-2 text-red-500 hover:bg-red-50 rounded-xl transition-all"
                             >
                               <X className="w-5 h-5" />

@@ -23,7 +23,8 @@ const initDb = async () => {
         id SERIAL PRIMARY KEY,
         email TEXT UNIQUE,
         password TEXT,
-        role TEXT DEFAULT 'editor'
+        role TEXT DEFAULT 'editor',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
 
       CREATE TABLE IF NOT EXISTS news (
@@ -33,6 +34,16 @@ const initDb = async () => {
         category TEXT,
         image_url TEXT,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        author_id INTEGER REFERENCES users(id)
+      );
+
+      CREATE TABLE IF NOT EXISTS documents (
+        id SERIAL PRIMARY KEY,
+        name TEXT,
+        category TEXT,
+        year TEXT,
+        url TEXT,
+        upload_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         author_id INTEGER REFERENCES users(id)
       );
     `);
@@ -74,6 +85,20 @@ async function startServer() {
   };
 
   // API Routes
+  app.post("/api/register", async (req, res) => {
+    const { email, password } = req.body;
+    try {
+      const hashedPassword = bcrypt.hashSync(password, 10);
+      await pool.query(
+        "INSERT INTO users (email, password, role) VALUES ($1, $2, $3)",
+        [email, hashedPassword, "pending"]
+      );
+      res.json({ message: "Cadastro realizado, aguarde aprovação" });
+    } catch (err) {
+      res.status(500).json({ message: "Erro ao realizar cadastro" });
+    }
+  });
+
   app.post("/api/login", async (req, res) => {
     const { email, password } = req.body;
     try {
@@ -81,6 +106,9 @@ async function startServer() {
       const user = rows[0];
 
       if (user && bcrypt.compareSync(password, user.password)) {
+        if (user.role === 'pending') {
+          return res.status(403).json({ message: "Sua conta está aguardando aprovação" });
+        }
         const token = jwt.sign({ id: user.id, email: user.email, role: user.role }, JWT_SECRET);
         res.json({ token, user: { email: user.email, role: user.role } });
       } else {
@@ -88,6 +116,38 @@ async function startServer() {
       }
     } catch (err) {
       res.status(500).json({ message: "Erro no servidor" });
+    }
+  });
+
+  app.get("/api/users/pending", authenticateToken, async (req: any, res) => {
+    if (req.user.role !== 'admin') return res.sendStatus(403);
+    try {
+      const { rows } = await pool.query("SELECT id, email, role, created_at FROM users WHERE role = 'pending'");
+      res.json(rows);
+    } catch (err) {
+      res.status(500).json({ message: "Erro ao buscar usuários pendentes" });
+    }
+  });
+
+  app.post("/api/users/approve", authenticateToken, async (req: any, res) => {
+    if (req.user.role !== 'admin') return res.sendStatus(403);
+    const { id, role } = req.body;
+    try {
+      await pool.query("UPDATE users SET role = $1 WHERE id = $2", [role, id]);
+      res.json({ message: "Usuário aprovado" });
+    } catch (err) {
+      res.status(500).json({ message: "Erro ao aprovar usuário" });
+    }
+  });
+
+  app.post("/api/users/reject", authenticateToken, async (req: any, res) => {
+    if (req.user.role !== 'admin') return res.sendStatus(403);
+    const { id } = req.body;
+    try {
+      await pool.query("DELETE FROM users WHERE id = $1", [id]);
+      res.json({ message: "Usuário rejeitado" });
+    } catch (err) {
+      res.status(500).json({ message: "Erro ao rejeitar usuário" });
     }
   });
 
@@ -120,6 +180,29 @@ async function startServer() {
       res.json({ message: "Notícia removida" });
     } catch (err) {
       res.status(500).json({ message: "Erro ao remover notícia" });
+    }
+  });
+
+  // Documents Routes
+  app.get("/api/documents", async (req, res) => {
+    try {
+      const { rows } = await pool.query("SELECT * FROM documents ORDER BY upload_date DESC");
+      res.json(rows);
+    } catch (err) {
+      res.status(500).json({ message: "Erro ao buscar documentos" });
+    }
+  });
+
+  app.post("/api/documents", authenticateToken, async (req: any, res) => {
+    const { name, category, year, url } = req.body;
+    try {
+      const { rows } = await pool.query(
+        "INSERT INTO documents (name, category, year, url, author_id) VALUES ($1, $2, $3, $4, $5) RETURNING id",
+        [name, category, year, url, req.user.id]
+      );
+      res.json({ id: rows[0].id });
+    } catch (error) {
+      res.status(500).json({ message: "Erro ao enviar documento" });
     }
   });
 
