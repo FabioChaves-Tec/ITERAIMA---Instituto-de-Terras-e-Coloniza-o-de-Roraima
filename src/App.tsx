@@ -56,7 +56,6 @@ import { Toaster, toast } from 'sonner';
 import { motion, AnimatePresence } from 'motion/react';
 import React, { useState, useEffect, FormEvent, Component, ErrorInfo, ReactNode } from 'react';
 import { api, User, News, TransparencyDocument, Presidencia, Diretoria, GaleriaPresidente } from './api';
-import { AiAssistant } from './components/AiAssistant';
 
 // Error Boundary Component
 class ErrorBoundary extends Component<any, any> {
@@ -934,9 +933,10 @@ export default function App() {
   ];
 
   return (
-    <div className="min-h-screen bg-background text-on-surface font-body pb-24">
-      {/* Sidebar / Drawer */}
-      <AnimatePresence>
+    <ErrorBoundary>
+      <div className="min-h-screen bg-background text-on-surface font-body pb-24">
+        {/* Sidebar / Drawer */}
+        <AnimatePresence>
         {isSidebarOpen && (
           <>
             <motion.div 
@@ -2934,15 +2934,8 @@ export default function App() {
         </button>
       </nav>
       
-      <AiAssistant 
-        news={newsList}
-        documents={documents}
-        presidencia={presidencia}
-        diretorias={diretorias}
-        galeria={galeria}
-      />
-
       <Toaster position="top-center" richColors />
     </div>
+    </ErrorBoundary>
   );
 }
