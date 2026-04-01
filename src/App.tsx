@@ -54,46 +54,9 @@ import {
 } from 'lucide-react';
 import { Toaster, toast } from 'sonner';
 import { motion, AnimatePresence } from 'motion/react';
-import React, { useState, useEffect, FormEvent, Component, ErrorInfo, ReactNode } from 'react';
+import React, { useState, useEffect, FormEvent } from 'react';
 import { api, User, News, TransparencyDocument, Presidencia, Diretoria, GaleriaPresidente } from './api';
-import { AiAssistant } from './components/AiAssistant';
-
-// Error Boundary Component
-class ErrorBoundary extends Component<any, any> {
-  public state = { hasError: false, errorInfo: '' };
-
-  static getDerivedStateFromError(error: Error) {
-    return { hasError: true, errorInfo: error.message };
-  }
-
-  componentDidCatch(error: Error, errorInfo: ErrorInfo) {
-    console.error("Uncaught error:", error, errorInfo);
-  }
-
-  render() {
-    if (this.state.hasError) {
-      return (
-        <div className="min-h-screen flex items-center justify-center bg-surface-container-low p-6">
-          <div className="bg-white p-8 rounded-[2.5rem] shadow-xl border border-primary/5 max-w-md w-full text-center">
-            <div className="w-16 h-16 bg-red-50 rounded-3xl flex items-center justify-center text-red-500 mx-auto mb-6">
-              <ShieldAlert className="w-8 h-8" />
-            </div>
-            <h2 className="text-2xl font-black text-on-surface font-headline mb-2">Ops! Algo deu errado</h2>
-            <p className="text-sm text-secondary mb-8">{this.state.errorInfo}</p>
-            <button 
-              onClick={() => window.location.reload()}
-              className="w-full bg-primary text-white font-bold py-4 rounded-2xl shadow-lg shadow-primary/20 active:scale-95 transition-all"
-            >
-              TENTAR NOVAMENTE
-            </button>
-          </div>
-        </div>
-      );
-    }
-
-    return (this as any).props.children;
-  }
-}
+const AiAssistant = React.lazy(() => import('./components/AiAssistant').then(m => ({ default: m.AiAssistant })));
 
 const IMAGES = {
   logo: 'https://iteraimacidadao.rr.gov.br/cadastrousuarioexterno/include/images/marca/logo_iteraima.png',
@@ -934,8 +897,7 @@ export default function App() {
   ];
 
   return (
-    <ErrorBoundary>
-      <div className="min-h-screen bg-background text-on-surface font-body pb-24">
+    <div className="min-h-screen bg-background text-on-surface font-body pb-24">
         {/* Sidebar / Drawer */}
         <AnimatePresence>
         {isSidebarOpen && (
@@ -2935,16 +2897,17 @@ export default function App() {
         </button>
       </nav>
       
-      <AiAssistant 
-        news={newsList}
-        documents={documents}
-        presidencia={presidencia}
-        diretorias={diretorias}
-        galeria={galeria}
-      />
+      <React.Suspense fallback={null}>
+        <AiAssistant 
+          news={newsList}
+          documents={documents}
+          presidencia={presidencia}
+          diretorias={diretorias}
+          galeria={galeria}
+        />
+      </React.Suspense>
       
       <Toaster position="top-center" richColors />
     </div>
-    </ErrorBoundary>
   );
 }

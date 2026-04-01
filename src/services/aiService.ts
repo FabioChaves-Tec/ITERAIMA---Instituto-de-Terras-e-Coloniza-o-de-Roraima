@@ -2,7 +2,18 @@ import { GoogleGenAI } from "@google/genai";
 import { TransparencyDocument, News, Presidencia, Diretoria, GaleriaPresidente } from "../api";
 import { extractTextFromPdf } from "../lib/pdfUtils";
 
-const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+let aiInstance: GoogleGenAI | null = null;
+
+function getAi() {
+  if (!aiInstance) {
+    const apiKey = process.env.GEMINI_API_KEY;
+    if (!apiKey) {
+      console.warn("GEMINI_API_KEY is missing. AI features will not work.");
+    }
+    aiInstance = new GoogleGenAI({ apiKey: apiKey || "" });
+  }
+  return aiInstance;
+}
 
 export async function getAiResponse(
   query: string,
@@ -15,6 +26,7 @@ export async function getAiResponse(
   }
 ) {
   try {
+    const ai = getAi();
     // Collect all news text
     const newsText = context.news
       .map(n => `Notícia (${n.category}): ${n.title}\n${n.content}`)
