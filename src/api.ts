@@ -63,6 +63,22 @@ export const api = {
     return res.json();
   },
 
+  async uploadFile(file: File): Promise<{ url: string }> {
+    const formData = new FormData();
+    formData.append('file', file);
+    
+    const token = localStorage.getItem('token');
+    const res = await fetch(`${API_URL}/api/upload`, {
+      method: 'POST',
+      headers: {
+        ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+      },
+      body: formData
+    });
+    if (!res.ok) throw new Error('Erro ao enviar arquivo');
+    return res.json();
+  },
+
   async getNews(): Promise<News[]> {
     const res = await fetch(`${API_URL}/api/news`);
     if (!res.ok) throw new Error('Erro ao buscar notícias');

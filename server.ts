@@ -6,8 +6,16 @@ import jwt from "jsonwebtoken";
 import bcrypt from "bcryptjs";
 import cors from "cors";
 import dotenv from "dotenv";
+import multer from "multer";
+import fs from "fs";
 
 dotenv.config();
+
+// Ensure uploads directory exists
+const uploadDir = path.join(process.cwd(), "uploads");
+if (!fs.existsSync(uploadDir)) {
+  fs.mkdirSync(uploadDir);
+}
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL || "postgres://postgres:postgres@localhost:5432/iteraima"
@@ -69,6 +77,19 @@ async function startServer() {
 
   app.use(cors());
   app.use(express.json());
+  app.use("/uploads", express.static(uploadDir));
+
+  // Multer Configuration
+  const storage = multer.diskStorage({
+    destination: (req, file, cb) => {
+      cb(null, uploadDir);
+    },
+    filename: (req, file, cb) => {
+      const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
+      cb(null, uniqueSuffix + path.extname(file.originalname));
+    }
+  });
+  const upload = multer({ storage });
 
   // Auth Middleware
   const authenticateToken = (req: any, res: any, next: any) => {
@@ -159,6 +180,12 @@ async function startServer() {
     } catch (err) {
       res.status(500).json({ message: "Erro ao rejeitar usuário" });
     }
+  });
+
+  app.post("/api/upload", authenticateToken, upload.single("file"), (req: any, res) => {
+    if (!req.file) return res.status(400).json({ message: "Nenhum arquivo enviado" });
+    const fileUrl = `/uploads/${req.file.filename}`;
+    res.json({ url: fileUrl });
   });
 
   app.get("/api/news", async (req, res) => {

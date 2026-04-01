@@ -155,6 +155,7 @@ export default function App() {
   const [newContent, setNewContent] = useState('');
   const [newCategory, setNewCategory] = useState('REGULARIZAÇÃO');
   const [newImageUrl, setNewImageUrl] = useState('');
+  const [newImageFile, setNewImageFile] = useState<File | null>(null);
   const [isPublishing, setIsPublishing] = useState(false);
   const [publishSuccess, setPublishSuccess] = useState(false);
   const [publishError, setPublishError] = useState('');
@@ -312,16 +313,24 @@ export default function App() {
     setPublishError('');
     setPublishSuccess(false);
     try {
+      let imageUrl = newImageUrl;
+      
+      if (newImageFile) {
+        const uploadRes = await api.uploadFile(newImageFile);
+        imageUrl = uploadRes.url;
+      }
+
       await api.publishNews({
         title: newTitle,
         content: newContent,
         category: newCategory,
-        image_url: newImageUrl
+        image_url: imageUrl
       });
       
       setNewTitle('');
       setNewContent('');
       setNewImageUrl('');
+      setNewImageFile(null);
       setPublishSuccess(true);
       
       // Refresh news
@@ -538,11 +547,61 @@ export default function App() {
       label: 'DE PESSOAS', 
       icon: Users,
       subItems: [
-        { label: 'CONCURSOS E SELEÇÕES', icon: UsersRound },
-        { label: 'DIÁRIAS', icon: CircleDollarSign },
-        { label: 'ESTAGIÁRIOS', icon: UserRound },
-        { label: 'FOLHA DE PAGAMENTO', icon: FileText },
-        { label: 'TERCEIRIZADOS', icon: Handshake }
+        { 
+          label: 'CONCURSOS E SELEÇÕES', 
+          icon: UsersRound,
+          subItems: [
+            { label: '2026', icon: Calendar },
+            { label: '2025', icon: Calendar },
+            { label: '2024', icon: Calendar },
+            { label: '2023', icon: Calendar },
+            { label: '2022', icon: Calendar }
+          ]
+        },
+        { 
+          label: 'DIÁRIAS', 
+          icon: CircleDollarSign,
+          subItems: [
+            { label: '2026', icon: Calendar },
+            { label: '2025', icon: Calendar },
+            { label: '2024', icon: Calendar },
+            { label: '2023', icon: Calendar },
+            { label: '2022', icon: Calendar }
+          ]
+        },
+        { 
+          label: 'ESTAGIÁRIOS', 
+          icon: UserRound,
+          subItems: [
+            { label: '2026', icon: Calendar },
+            { label: '2025', icon: Calendar },
+            { label: '2024', icon: Calendar },
+            { label: '2023', icon: Calendar },
+            { label: '2022', icon: Calendar }
+          ]
+        },
+        { 
+          label: 'FOLHA DE PAGAMENTO', 
+          icon: FileText,
+          subItems: [
+            { label: '2026', icon: Calendar },
+            { label: '2025', icon: Calendar },
+            { label: '2024', icon: Calendar },
+            { label: '2023', icon: Calendar },
+            { label: '2022', icon: Calendar }
+          ]
+        },
+        { 
+          label: 'TERCEIRIZADOS', 
+          icon: Handshake,
+          subItems: [
+            { label: '2026', icon: Calendar },
+            { label: '2025', icon: Calendar },
+            { label: '2024', icon: Calendar },
+            { label: '2023', icon: Calendar },
+            { label: '2022', icon: Calendar }
+          ]
+        }
       ]
     }
   ];
@@ -1632,14 +1691,25 @@ export default function App() {
                           </select>
                         </div>
                         <div>
-                          <label className="block text-[10px] font-bold text-secondary uppercase tracking-widest mb-1.5 ml-1">URL da Imagem</label>
-                          <input 
-                            type="url" 
-                            value={newImageUrl}
-                            onChange={(e) => setNewImageUrl(e.target.value)}
-                            className="w-full bg-surface-container-low border-none rounded-2xl px-4 py-3 text-sm focus:ring-2 focus:ring-primary transition-all"
-                            placeholder="https://..."
-                          />
+                          <label className="block text-[10px] font-bold text-secondary uppercase tracking-widest mb-1.5 ml-1">Imagem da Notícia</label>
+                          <div className="relative">
+                            <input 
+                              type="file" 
+                              accept="image/*"
+                              onChange={(e) => setNewImageFile(e.target.files ? e.target.files[0] : null)}
+                              className="hidden"
+                              id="news-image-upload"
+                            />
+                            <label 
+                              htmlFor="news-image-upload"
+                              className="w-full flex items-center justify-between bg-surface-container-low border-2 border-dashed border-primary/10 rounded-2xl px-4 py-3 text-sm cursor-pointer hover:bg-primary/5 transition-all"
+                            >
+                              <span className="text-secondary truncate">
+                                {newImageFile ? newImageFile.name : 'Selecionar imagem...'}
+                              </span>
+                              <Image className="w-4 h-4 text-primary" />
+                            </label>
+                          </div>
                         </div>
                       </div>
 
