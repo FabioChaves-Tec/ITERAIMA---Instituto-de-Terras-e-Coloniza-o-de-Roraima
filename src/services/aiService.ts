@@ -73,22 +73,6 @@ export async function getAiResponse(
       5. Use Markdown para formatar suas respostas (negrito, listas, etc).
     `;
 
-    const response = await ai.models.generateContent({
-      model: "gemini-3-flash-preview",
-      contents: query,
-      config: {
-        systemInstruction,
-        tools: docUrls.length > 0 ? [{ urlContext: {} }] : undefined,
-      },
-    });
-
-    // Note: In a real scenario, we might need to include the URLs in the prompt 
-    // or use them as context. The urlContext tool in Gemini 3 handles this if URLs are provided in the request.
-    // Wait, the urlContext tool documentation says: "By including URLs in your request..."
-    // But where do I put the URLs? 
-    // Ah, the example shows: "contents: 'Summarize the recent events based on https://www.sfmoma.org'"
-    // So I should include the URLs in the prompt or as part of the contents.
-
     // Let's refine the contents to include the URLs for the model to fetch.
     const promptWithUrls = `
       Pergunta do Usuário: ${query}
@@ -97,16 +81,16 @@ export async function getAiResponse(
       ${docUrls.join('\n')}
     `;
 
-    const finalResponse = await ai.models.generateContent({
+    const response = await ai.models.generateContent({
       model: "gemini-3-flash-preview",
       contents: promptWithUrls,
       config: {
         systemInstruction,
-        tools: [{ urlContext: {} }],
+        tools: docUrls.length > 0 ? [{ urlContext: {} }] : undefined,
       },
     });
 
-    return finalResponse.text;
+    return response.text;
   } catch (error) {
     console.error('Error getting AI response:', error);
     return 'Desculpe, ocorreu um erro ao processar sua pergunta. Por favor, tente novamente mais tarde.';

@@ -1,11 +1,9 @@
-// import * as pdfjsLib from 'pdfjs-dist';
+import * as pdfjsLib from 'pdfjs-dist';
 
 // Set worker source for pdfjs
-// pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.mjs`;
+pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.mjs`;
 
 export async function extractTextFromPdf(url: string): Promise<string> {
-  return '';
-  /*
   try {
     const loadingTask = pdfjsLib.getDocument(url);
     const pdf = await loadingTask.promise;
@@ -25,5 +23,4 @@ export async function extractTextFromPdf(url: string): Promise<string> {
     console.error('Error extracting text from PDF:', error);
     return '';
   }
-  */
 }

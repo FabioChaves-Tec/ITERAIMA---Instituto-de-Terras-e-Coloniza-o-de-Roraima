@@ -56,6 +56,7 @@ import { Toaster, toast } from 'sonner';
 import { motion, AnimatePresence } from 'motion/react';
 import React, { useState, useEffect, FormEvent, Component, ErrorInfo, ReactNode } from 'react';
 import { api, User, News, TransparencyDocument, Presidencia, Diretoria, GaleriaPresidente } from './api';
+import { AiAssistant } from './components/AiAssistant';
 
 // Error Boundary Component
 class ErrorBoundary extends Component<any, any> {
@@ -2933,6 +2934,14 @@ export default function App() {
           <span className="text-[11px] font-medium uppercase tracking-wider mt-1">Admin</span>
         </button>
       </nav>
+      
+      <AiAssistant 
+        news={newsList}
+        documents={documents}
+        presidencia={presidencia}
+        diretorias={diretorias}
+        galeria={galeria}
+      />
       
       <Toaster position="top-center" richColors />
     </div>
