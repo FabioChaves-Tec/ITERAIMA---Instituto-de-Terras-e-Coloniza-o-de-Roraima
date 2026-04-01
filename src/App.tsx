@@ -112,7 +112,17 @@ const transparencyCategories = [
   'INEXIGIBILIDADE',
   'RESULTADO',
   'SÍNTESE',
-  'ATA DE REGISTRO DE PREÇOS'
+  'ATA DE REGISTRO DE PREÇOS',
+  'PLANO DE CONTRATAÇÃO ANUAL – PCA',
+  'IMÓVEIS',
+  'REGULARIZADOS',
+  'NOTIFICAÇÕES',
+  'REQUERIMENTO DE REGULARIZAÇÃO',
+  'CONCURSOS E SELEÇÕES',
+  'DIÁRIAS',
+  'ESTAGIÁRIOS',
+  'FOLHA DE PAGAMENTO',
+  'TERCEIRIZADOS'
 ];
 
 export default function App() {
@@ -716,10 +726,50 @@ export default function App() {
       label: 'FUNDIÁRIA', 
       icon: Map,
       subItems: [
-        { label: 'IMÓVEIS', icon: Home },
-        { label: 'REGULARIZADOS', icon: FileSignature },
-        { label: 'NOTIFICAÇÕES', icon: Rss },
-        { label: 'REQUERIMENTO DE REGULARIZAÇÃO', icon: ClipboardList }
+        { 
+          label: 'IMÓVEIS', 
+          icon: Home,
+          subItems: [
+            { label: '2026', icon: Calendar },
+            { label: '2025', icon: Calendar },
+            { label: '2024', icon: Calendar },
+            { label: '2023', icon: Calendar },
+            { label: '2022', icon: Calendar }
+          ]
+        },
+        { 
+          label: 'REGULARIZADOS', 
+          icon: FileSignature,
+          subItems: [
+            { label: '2026', icon: Calendar },
+            { label: '2025', icon: Calendar },
+            { label: '2024', icon: Calendar },
+            { label: '2023', icon: Calendar },
+            { label: '2022', icon: Calendar }
+          ]
+        },
+        { 
+          label: 'NOTIFICAÇÕES', 
+          icon: Rss,
+          subItems: [
+            { label: '2026', icon: Calendar },
+            { label: '2025', icon: Calendar },
+            { label: '2024', icon: Calendar },
+            { label: '2023', icon: Calendar },
+            { label: '2022', icon: Calendar }
+          ]
+        },
+        { 
+          label: 'REQUERIMENTO DE REGULARIZAÇÃO', 
+          icon: ClipboardList,
+          subItems: [
+            { label: '2026', icon: Calendar },
+            { label: '2025', icon: Calendar },
+            { label: '2024', icon: Calendar },
+            { label: '2023', icon: Calendar },
+            { label: '2022', icon: Calendar }
+          ]
+        }
       ]
     },
     { 
