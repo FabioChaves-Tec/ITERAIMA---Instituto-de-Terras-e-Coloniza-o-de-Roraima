@@ -122,6 +122,7 @@ export default function App() {
   const [showLegislacaoSub, setShowLegislacaoSub] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [currentPage, setCurrentPage] = useState<'home' | 'news' | 'admin' | 'folder'>('home');
+  const [adminTab, setAdminTab] = useState<'publish' | 'users' | 'documents'>('publish');
   const [selectedFolder, setSelectedFolder] = useState<{ label: string, items: any[] } | null>(null);
   const [selectedYear, setSelectedYear] = useState<string | null>(null);
   
@@ -147,6 +148,7 @@ export default function App() {
 
   // Admin State
   const [pendingUsers, setPendingUsers] = useState<User[]>([]);
+  const [allUsers, setAllUsers] = useState<User[]>([]);
 
   // Publish State
   const [newTitle, setNewTitle] = useState('');
@@ -203,8 +205,22 @@ export default function App() {
           console.error("Error fetching pending users:", error);
         }
       };
+      
+      const fetchAll = async () => {
+        try {
+          const users = await api.getUsers();
+          setAllUsers(users);
+        } catch (error) {
+          console.error("Error fetching all users:", error);
+        }
+      };
+
       fetchPending();
-      const interval = setInterval(fetchPending, 30000);
+      fetchAll();
+      const interval = setInterval(() => {
+        fetchPending();
+        fetchAll();
+      }, 30000);
       return () => clearInterval(interval);
     }
   }, [user]);
@@ -1531,10 +1547,10 @@ export default function App() {
                 </form>
               </div>
             ) : (
-              <div className="max-w-2xl mx-auto">
+              <div className="max-w-4xl mx-auto">
                 <div className="flex items-center justify-between mb-8">
                   <div>
-                    <h2 className="text-3xl font-black text-on-surface font-headline leading-none">Publicar Notícia</h2>
+                    <h2 className="text-3xl font-black text-on-surface font-headline leading-none">Painel Administrativo</h2>
                     <p className="text-xs text-secondary mt-2">Olá, {user?.email}</p>
                   </div>
                   <button 
@@ -1546,164 +1562,265 @@ export default function App() {
                   </button>
                 </div>
 
-                <form onSubmit={handlePublish} className="bg-white p-8 rounded-3xl shadow-xl border border-primary/5 space-y-6">
-                  <div className="grid gap-6">
-                    <div>
-                      <label className="block text-[10px] font-bold text-secondary uppercase tracking-widest mb-1.5 ml-1">Título da Notícia</label>
-                      <input 
-                        type="text" 
-                        value={newTitle}
-                        onChange={(e) => setNewTitle(e.target.value)}
-                        className="w-full bg-surface-container-low border-none rounded-2xl px-4 py-3 text-sm focus:ring-2 focus:ring-primary transition-all"
-                        placeholder="Ex: Novo mutirão de regularização..."
-                        required
-                      />
-                    </div>
-                    
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <label className="block text-[10px] font-bold text-secondary uppercase tracking-widest mb-1.5 ml-1">Categoria</label>
-                        <select 
-                          value={newCategory}
-                          onChange={(e) => setNewCategory(e.target.value)}
-                          className="w-full bg-surface-container-low border-none rounded-2xl px-4 py-3 text-sm focus:ring-2 focus:ring-primary transition-all"
-                        >
-                          <option value="REGULARIZAÇÃO">REGULARIZAÇÃO</option>
-                          <option value="INSTITUCIONAL">INSTITUCIONAL</option>
-                          <option value="PRODUTOR RURAL">PRODUTOR RURAL</option>
-                          <option value="AVISO">AVISO</option>
-                        </select>
+                {/* Admin Tabs */}
+                {(user?.role === 'admin' || user?.role === 'editor') && (
+                  <div className="flex gap-2 mb-8 bg-white p-1.5 rounded-2xl shadow-sm border border-primary/5">
+                    <button 
+                      onClick={() => setAdminTab('publish')}
+                      className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl font-bold text-xs transition-all ${adminTab === 'publish' ? 'bg-primary text-white shadow-lg shadow-primary/20' : 'text-secondary hover:bg-primary/5'}`}
+                    >
+                      <Newspaper className="w-4 h-4" />
+                      NOTÍCIAS
+                    </button>
+                    {user?.role === 'admin' && (
+                      <button 
+                        onClick={() => setAdminTab('users')}
+                        className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl font-bold text-xs transition-all ${adminTab === 'users' ? 'bg-primary text-white shadow-lg shadow-primary/20' : 'text-secondary hover:bg-primary/5'}`}
+                      >
+                        <UsersRound className="w-4 h-4" />
+                        USUÁRIOS
+                        {pendingUsers.length > 0 && (
+                          <span className="bg-red-500 text-white text-[8px] px-1.5 py-0.5 rounded-full animate-pulse ml-1">
+                            {pendingUsers.length}
+                          </span>
+                        )}
+                      </button>
+                    )}
+                    <button 
+                      onClick={() => setAdminTab('documents')}
+                      className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl font-bold text-xs transition-all ${adminTab === 'documents' ? 'bg-primary text-white shadow-lg shadow-primary/20' : 'text-secondary hover:bg-primary/5'}`}
+                    >
+                      <Folder className="w-4 h-4" />
+                      DOCUMENTOS
+                    </button>
+                  </div>
+                )}
+
+                {adminTab === 'publish' && (
+                  <form onSubmit={handlePublish} className="bg-white p-8 rounded-3xl shadow-xl border border-primary/5 space-y-6">
+                    <div className="flex items-center gap-3 mb-2">
+                      <div className="w-8 h-8 bg-primary/10 rounded-lg flex items-center justify-center text-primary">
+                        <Plus className="w-4 h-4" />
                       </div>
+                      <h3 className="text-lg font-black text-on-surface font-headline uppercase tracking-wider">Nova Notícia</h3>
+                    </div>
+                    <div className="grid gap-6">
                       <div>
-                        <label className="block text-[10px] font-bold text-secondary uppercase tracking-widest mb-1.5 ml-1">URL da Imagem</label>
+                        <label className="block text-[10px] font-bold text-secondary uppercase tracking-widest mb-1.5 ml-1">Título da Notícia</label>
                         <input 
-                          type="url" 
-                          value={newImageUrl}
-                          onChange={(e) => setNewImageUrl(e.target.value)}
+                          type="text" 
+                          value={newTitle}
+                          onChange={(e) => setNewTitle(e.target.value)}
                           className="w-full bg-surface-container-low border-none rounded-2xl px-4 py-3 text-sm focus:ring-2 focus:ring-primary transition-all"
-                          placeholder="https://..."
+                          placeholder="Ex: Novo mutirão de regularização..."
+                          required
+                        />
+                      </div>
+                      
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <label className="block text-[10px] font-bold text-secondary uppercase tracking-widest mb-1.5 ml-1">Categoria</label>
+                          <select 
+                            value={newCategory}
+                            onChange={(e) => setNewCategory(e.target.value)}
+                            className="w-full bg-surface-container-low border-none rounded-2xl px-4 py-3 text-sm focus:ring-2 focus:ring-primary transition-all"
+                          >
+                            <option value="REGULARIZAÇÃO">REGULARIZAÇÃO</option>
+                            <option value="INSTITUCIONAL">INSTITUCIONAL</option>
+                            <option value="PRODUTOR RURAL">PRODUTOR RURAL</option>
+                            <option value="AVISO">AVISO</option>
+                          </select>
+                        </div>
+                        <div>
+                          <label className="block text-[10px] font-bold text-secondary uppercase tracking-widest mb-1.5 ml-1">URL da Imagem</label>
+                          <input 
+                            type="url" 
+                            value={newImageUrl}
+                            onChange={(e) => setNewImageUrl(e.target.value)}
+                            className="w-full bg-surface-container-low border-none rounded-2xl px-4 py-3 text-sm focus:ring-2 focus:ring-primary transition-all"
+                            placeholder="https://..."
+                          />
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="block text-[10px] font-bold text-secondary uppercase tracking-widest mb-1.5 ml-1">Conteúdo</label>
+                        <textarea 
+                          value={newContent}
+                          onChange={(e) => setNewContent(e.target.value)}
+                          className="w-full bg-surface-container-low border-none rounded-2xl px-4 py-3 text-sm focus:ring-2 focus:ring-primary transition-all min-h-[200px]"
+                          placeholder="Escreva o corpo da notícia aqui..."
+                          required
                         />
                       </div>
                     </div>
 
-                    <div>
-                      <label className="block text-[10px] font-bold text-secondary uppercase tracking-widest mb-1.5 ml-1">Conteúdo</label>
-                      <textarea 
-                        value={newContent}
-                        onChange={(e) => setNewContent(e.target.value)}
-                        className="w-full bg-surface-container-low border-none rounded-2xl px-4 py-3 text-sm focus:ring-2 focus:ring-primary transition-all min-h-[200px]"
-                        placeholder="Escreva o corpo da notícia aqui..."
-                        required
-                      />
-                    </div>
-                  </div>
+                    <button 
+                      type="submit"
+                      disabled={isPublishing}
+                      className={`w-full ${isPublishing ? 'bg-gray-400' : 'bg-primary'} text-white font-bold py-4 rounded-2xl shadow-lg shadow-primary/20 active:scale-95 transition-all flex items-center justify-center gap-2`}
+                    >
+                      {isPublishing ? (
+                        <>
+                          <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                          PUBLICANDO...
+                        </>
+                      ) : (
+                        <>
+                          <Plus className="w-5 h-5" />
+                          PUBLICAR AGORA
+                        </>
+                      )}
+                    </button>
 
-                  <button 
-                    type="submit"
-                    disabled={isPublishing}
-                    className={`w-full ${isPublishing ? 'bg-gray-400' : 'bg-primary'} text-white font-bold py-4 rounded-2xl shadow-lg shadow-primary/20 active:scale-95 transition-all flex items-center justify-center gap-2`}
-                  >
-                    {isPublishing ? (
-                      <>
-                        <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                        PUBLICANDO...
-                      </>
-                    ) : (
-                      <>
-                        <Plus className="w-5 h-5" />
-                        PUBLICAR AGORA
-                      </>
+                    {publishSuccess && (
+                      <motion.div 
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        className="bg-green-50 text-green-600 p-4 rounded-2xl text-center text-sm font-bold border border-green-100 mt-4"
+                      >
+                        Notícia publicada com sucesso!
+                      </motion.div>
                     )}
-                  </button>
 
-                  {publishSuccess && (
-                    <motion.div 
-                      initial={{ opacity: 0, y: 10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      className="bg-green-50 text-green-600 p-4 rounded-2xl text-center text-sm font-bold border border-green-100 mt-4"
-                    >
-                      Notícia publicada com sucesso!
-                    </motion.div>
-                  )}
+                    {publishError && (
+                      <motion.div 
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        className="bg-red-50 text-red-600 p-4 rounded-2xl text-center text-sm font-bold border border-red-100 mt-4"
+                      >
+                        {publishError}
+                      </motion.div>
+                    )}
+                  </form>
+                )}
 
-                  {publishError && (
-                    <motion.div 
-                      initial={{ opacity: 0, y: 10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      className="bg-red-50 text-red-600 p-4 rounded-2xl text-center text-sm font-bold border border-red-100 mt-4"
-                    >
-                      {publishError}
-                    </motion.div>
-                  )}
-                </form>
-
-                {/* User Management Section - Admin Only */}
-                {user?.role === 'admin' && pendingUsers.length > 0 && (
-                  <div className="mt-12 pt-12 border-t border-primary/10">
-                    <div className="flex items-center gap-4 mb-8">
-                      <div className="w-12 h-12 bg-primary/10 rounded-2xl flex items-center justify-center text-primary">
-                        <UserPlus className="w-6 h-6" />
-                      </div>
-                      <div>
-                        <h2 className="text-2xl font-black text-on-surface font-headline leading-none">Aprovação de Usuários</h2>
-                        <p className="text-xs text-secondary mt-1">Gerencie novos cadastros e atribua funções</p>
-                      </div>
-                    </div>
-
-                    <div className="grid gap-4">
-                      {pendingUsers.map(pendingUser => (
-                        <div key={pendingUser.id} className="bg-white p-6 rounded-3xl border border-primary/5 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-6">
-                          <div>
-                            <span className="block text-sm font-bold text-primary">{pendingUser.email}</span>
-                            <span className="text-[10px] text-secondary font-medium uppercase tracking-wider">
-                              Solicitado em: {pendingUser.created_at ? new Date(pendingUser.created_at).toLocaleDateString('pt-BR') : 'Recentemente'}
-                            </span>
+                {adminTab === 'users' && user?.role === 'admin' && (
+                  <div className="space-y-8">
+                    {/* Pending Users */}
+                    {pendingUsers.length > 0 && (
+                      <div className="bg-white p-8 rounded-3xl shadow-xl border border-primary/5">
+                        <div className="flex items-center gap-4 mb-8">
+                          <div className="w-12 h-12 bg-primary/10 rounded-2xl flex items-center justify-center text-primary">
+                            <UserPlus className="w-6 h-6" />
                           </div>
-                          <div className="flex items-center gap-2">
-                            <button 
-                              onClick={() => handleApproveUser(pendingUser.id, 'viewer')}
-                              className="px-4 py-2 bg-surface-container-low text-primary text-[10px] font-bold rounded-xl hover:bg-primary/10 transition-all uppercase tracking-widest"
-                            >
-                              Viewer
-                            </button>
-                            <button 
-                              onClick={() => handleApproveUser(pendingUser.id, 'editor')}
-                              className="px-4 py-2 bg-primary/10 text-primary text-[10px] font-bold rounded-xl hover:bg-primary/20 transition-all uppercase tracking-widest"
-                            >
-                              Editor
-                            </button>
-                            <button 
-                              onClick={() => handleApproveUser(pendingUser.id, 'admin')}
-                              className="px-4 py-2 bg-primary text-white text-[10px] font-bold rounded-xl hover:opacity-90 transition-all uppercase tracking-widest"
-                            >
-                              Admin
-                            </button>
-                            <button 
-                              onClick={() => handleRejectUser(pendingUser.id)}
-                              className="p-2 text-red-500 hover:bg-red-50 rounded-xl transition-all"
-                            >
-                              <X className="w-5 h-5" />
-                            </button>
+                          <div>
+                            <h3 className="text-2xl font-black text-on-surface font-headline leading-none">Aprovações Pendentes</h3>
+                            <p className="text-xs text-secondary mt-1">Usuários aguardando acesso ao sistema</p>
                           </div>
                         </div>
-                      ))}
+                        <div className="grid gap-4">
+                          {pendingUsers.map((pendingUser) => (
+                            <div key={pendingUser.id} className="bg-surface-container-low p-6 rounded-2xl flex flex-col md:flex-row md:items-center justify-between gap-6 border border-primary/5">
+                              <div>
+                                <p className="font-bold text-on-surface">{pendingUser.email}</p>
+                                <p className="text-[10px] text-secondary uppercase tracking-widest mt-1">Solicitado em: {new Date(pendingUser.created_at!).toLocaleDateString()}</p>
+                              </div>
+                              <div className="flex flex-wrap items-center gap-2">
+                                <button 
+                                  onClick={() => handleApproveUser(pendingUser.id, 'viewer')}
+                                  className="bg-white text-primary border border-primary/10 px-4 py-2 rounded-xl text-[10px] font-bold hover:bg-primary hover:text-white transition-all shadow-sm"
+                                >
+                                  APROVAR COMO LEITOR
+                                </button>
+                                <button 
+                                  onClick={() => handleApproveUser(pendingUser.id, 'editor')}
+                                  className="bg-white text-primary border border-primary/10 px-4 py-2 rounded-xl text-[10px] font-bold hover:bg-primary hover:text-white transition-all shadow-sm"
+                                >
+                                  APROVAR COMO EDITOR
+                                </button>
+                                <button 
+                                  onClick={() => handleRejectUser(pendingUser.id)}
+                                  className="bg-red-50 text-red-500 px-4 py-2 rounded-xl text-[10px] font-bold hover:bg-red-500 hover:text-white transition-all shadow-sm"
+                                >
+                                  REJEITAR
+                                </button>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* All Users List */}
+                    <div className="bg-white p-8 rounded-3xl shadow-xl border border-primary/5">
+                      <div className="flex items-center gap-4 mb-8">
+                        <div className="w-12 h-12 bg-primary/10 rounded-2xl flex items-center justify-center text-primary">
+                          <UsersRound className="w-6 h-6" />
+                        </div>
+                        <div>
+                          <h3 className="text-2xl font-black text-on-surface font-headline leading-none">Todos os Usuários</h3>
+                          <p className="text-xs text-secondary mt-1">Gerencie permissões e acessos existentes</p>
+                        </div>
+                      </div>
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-left border-collapse">
+                          <thead>
+                            <tr className="border-b border-primary/10">
+                              <th className="pb-4 text-[10px] font-bold text-secondary uppercase tracking-widest">E-mail</th>
+                              <th className="pb-4 text-[10px] font-bold text-secondary uppercase tracking-widest">Função</th>
+                              <th className="pb-4 text-[10px] font-bold text-secondary uppercase tracking-widest">Data</th>
+                              <th className="pb-4 text-[10px] font-bold text-secondary uppercase tracking-widest text-right">Ações</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-primary/5">
+                            {allUsers.filter(u => u.role !== 'pending').map((u) => (
+                              <tr key={u.id} className="group">
+                                <td className="py-4 text-sm font-medium">{u.email}</td>
+                                <td className="py-4">
+                                  <span className={`text-[9px] font-bold px-2 py-1 rounded-full uppercase tracking-widest ${
+                                    u.role === 'admin' ? 'bg-purple-100 text-purple-600' :
+                                    u.role === 'editor' ? 'bg-blue-100 text-blue-600' :
+                                    'bg-gray-100 text-gray-600'
+                                  }`}>
+                                    {u.role}
+                                  </span>
+                                </td>
+                                <td className="py-4 text-xs text-secondary">{new Date(u.created_at!).toLocaleDateString()}</td>
+                                <td className="py-4 text-right">
+                                  {u.email !== user?.email && (
+                                    <div className="flex items-center justify-end gap-2">
+                                      <select 
+                                        value={u.role}
+                                        onChange={(e) => handleApproveUser(u.id, e.target.value as any)}
+                                        className="bg-surface-container-low border-none rounded-lg px-2 py-1 text-[10px] font-bold focus:ring-1 focus:ring-primary"
+                                      >
+                                        <option value="admin">Admin</option>
+                                        <option value="editor">Editor</option>
+                                        <option value="viewer">Leitor</option>
+                                      </select>
+                                      <button 
+                                        onClick={() => handleRejectUser(u.id)}
+                                        className="p-2 text-red-500 hover:bg-red-50 rounded-lg transition-all"
+                                        title="Remover Usuário"
+                                      >
+                                        <Trash2 className="w-4 h-4" />
+                                      </button>
+                                    </div>
+                                  )}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
                     </div>
                   </div>
                 )}
 
-                {/* Document Upload Section - Admin/Editor Only */}
-                {(user?.role === 'admin' || user?.role === 'editor') && (
-                  <div className="mt-12 pt-12 border-t border-primary/10">
-                    <div className="flex items-center gap-4 mb-8">
+                {adminTab === 'documents' && (
+                  <div className="bg-white p-8 rounded-3xl shadow-xl border border-primary/5 space-y-8">
+                    <div className="flex items-center gap-4 mb-4">
                       <div className="w-12 h-12 bg-primary/10 rounded-2xl flex items-center justify-center text-primary">
                         <Upload className="w-6 h-6" />
                       </div>
                       <div>
-                        <h2 className="text-2xl font-black text-on-surface font-headline leading-none">Upload de Documentos</h2>
-                        <p className="text-xs text-secondary mt-1">Adicione novos arquivos ao portal da transparência</p>
+                        <h3 className="text-2xl font-black text-on-surface font-headline leading-none">Upload de Documentos</h3>
+                        <p className="text-xs text-secondary mt-1">Adicione arquivos ao Portal da Transparência</p>
                       </div>
                     </div>
-                    <div className="bg-white p-8 rounded-3xl shadow-xl border border-primary/5 space-y-6">
+
+                    <div className="grid gap-6">
                       <div className="grid grid-cols-2 gap-4">
                         <div>
                           <label className="block text-[10px] font-bold text-secondary uppercase tracking-widest mb-1.5 ml-1">Categoria</label>
@@ -1731,49 +1848,41 @@ export default function App() {
                         </div>
                       </div>
 
-                      <div className="relative">
+                      <div 
+                        className="border-2 border-dashed border-primary/10 rounded-3xl p-12 text-center hover:border-primary/5 transition-all cursor-pointer"
+                        onClick={() => document.getElementById('file-upload')?.click()}
+                      >
                         <input 
+                          id="file-upload"
                           type="file" 
-                          multiple 
-                          accept=".pdf"
+                          multiple
+                          className="hidden"
                           onChange={(e) => {
-                            const files = Array.from(e.target.files || []);
-                            if (files.length > 10) {
-                              toast.error('Máximo de 10 arquivos por vez');
-                              setSelectedFiles(files.slice(0, 10));
-                            } else {
-                              setSelectedFiles(files);
+                            if (e.target.files) {
+                              setSelectedFiles(Array.from(e.target.files));
                             }
                           }}
-                          className="hidden" 
-                          id="pdf-upload"
                         />
-                        <label 
-                          htmlFor="pdf-upload"
-                          className="w-full border-2 border-dashed border-primary/20 rounded-3xl p-8 flex flex-col items-center justify-center gap-3 cursor-pointer hover:bg-primary/5 transition-all group"
-                        >
-                          <div className="w-14 h-14 bg-primary/5 rounded-full flex items-center justify-center text-primary group-hover:scale-110 transition-transform">
-                            <Upload className="w-7 h-7" />
-                          </div>
-                          <div className="text-center">
-                            <span className="block text-sm font-bold text-primary">Clique para selecionar PDFs</span>
-                            <span className="text-[10px] text-secondary font-medium uppercase tracking-wider">Até 10 arquivos simultâneos</span>
-                          </div>
-                        </label>
+                        <div className="w-16 h-16 bg-primary/5 rounded-full flex items-center justify-center mx-auto mb-4 text-primary">
+                          <FileText className="w-8 h-8" />
+                        </div>
+                        <p className="text-sm font-bold text-on-surface">Arraste arquivos ou clique para selecionar</p>
+                        <p className="text-xs text-secondary mt-1">PDF, DOCX, XLSX (Máx. 10MB)</p>
                       </div>
 
                       {selectedFiles.length > 0 && (
                         <div className="space-y-2">
-                          <div className="flex items-center justify-between px-2">
-                            <span className="text-[10px] font-bold text-secondary uppercase tracking-widest">Arquivos Selecionados ({selectedFiles.length})</span>
-                            <button onClick={() => setSelectedFiles([])} className="text-[10px] font-bold text-red-500 uppercase tracking-widest">Limpar</button>
-                          </div>
+                          <p className="text-[10px] font-bold text-secondary uppercase tracking-widest ml-1">Arquivos Selecionados ({selectedFiles.length})</p>
                           <div className="grid gap-2">
-                            {selectedFiles.map((file, i) => (
-                              <div key={i} className="flex items-center gap-3 p-3 bg-surface-container-low rounded-xl border border-primary/5">
-                                <File className="w-4 h-4 text-primary opacity-60" />
-                                <span className="text-xs font-medium text-primary truncate flex-1">{file.name}</span>
-                                <CheckCircle2 className="w-4 h-4 text-green-500" />
+                            {selectedFiles.map((file, idx) => (
+                              <div key={idx} className="bg-surface-container-low p-3 rounded-xl flex items-center justify-between text-xs font-medium">
+                                <div className="flex items-center gap-2">
+                                  <File className="w-4 h-4 text-primary opacity-60" />
+                                  {file.name}
+                                </div>
+                                <button onClick={() => setSelectedFiles(prev => prev.filter((_, i) => i !== idx))} className="text-red-500 hover:bg-red-50 p-1 rounded-lg">
+                                  <X className="w-4 h-4" />
+                                </button>
                               </div>
                             ))}
                           </div>
@@ -1792,7 +1901,7 @@ export default function App() {
                           </>
                         ) : (
                           <>
-                            <Upload className="w-5 h-5" />
+                            <Plus className="w-5 h-5" />
                             ENVIAR DOCUMENTOS
                           </>
                         )}

@@ -119,6 +119,16 @@ async function startServer() {
     }
   });
 
+  app.get("/api/users", authenticateToken, async (req: any, res) => {
+    if (req.user.role !== 'admin') return res.sendStatus(403);
+    try {
+      const { rows } = await pool.query("SELECT id, email, role, created_at FROM users ORDER BY created_at DESC");
+      res.json(rows);
+    } catch (err) {
+      res.status(500).json({ message: "Erro ao buscar usuários" });
+    }
+  });
+
   app.get("/api/users/pending", authenticateToken, async (req: any, res) => {
     if (req.user.role !== 'admin') return res.sendStatus(403);
     try {

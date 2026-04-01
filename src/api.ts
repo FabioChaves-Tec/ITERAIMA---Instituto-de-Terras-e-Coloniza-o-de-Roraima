@@ -112,6 +112,14 @@ export const api = {
     return res.json();
   },
 
+  async getUsers(): Promise<User[]> {
+    const res = await fetch(`${API_URL}/api/users`, {
+      headers: getHeaders()
+    });
+    if (!res.ok) throw new Error('Erro ao buscar todos os usuários');
+    return res.json();
+  },
+
   async approveUser(id: number, role: string) {
     const res = await fetch(`${API_URL}/api/users/approve`, {
       method: 'POST',
