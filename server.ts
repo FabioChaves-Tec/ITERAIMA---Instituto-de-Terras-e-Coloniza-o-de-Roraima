@@ -50,6 +50,7 @@ const initDb = async () => {
         name TEXT,
         category TEXT,
         year TEXT,
+        month TEXT,
         url TEXT,
         upload_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         author_id INTEGER REFERENCES users(id)
@@ -397,15 +398,25 @@ async function startServer() {
   });
 
   app.post("/api/documents", authenticateToken, async (req: any, res) => {
-    const { name, category, year, url } = req.body;
+    const { name, category, year, month, url } = req.body;
     try {
       const { rows } = await pool.query(
-        "INSERT INTO documents (name, category, year, url, author_id) VALUES ($1, $2, $3, $4, $5) RETURNING id",
-        [name, category, year, url, req.user.id]
+        "INSERT INTO documents (name, category, year, month, url, author_id) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id",
+        [name, category, year, month, url, req.user.id]
       );
       res.json({ id: rows[0].id });
     } catch (error) {
       res.status(500).json({ message: "Erro ao enviar documento" });
+    }
+  });
+
+  app.delete("/api/documents/:id", authenticateToken, async (req: any, res) => {
+    if (req.user.role !== 'admin' && req.user.role !== 'editor') return res.sendStatus(403);
+    try {
+      await pool.query("DELETE FROM documents WHERE id = $1", [req.params.id]);
+      res.json({ message: "Documento removido com sucesso" });
+    } catch (err) {
+      res.status(500).json({ message: "Erro ao remover documento" });
     }
   });
 

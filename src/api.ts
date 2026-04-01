@@ -23,6 +23,7 @@ export interface TransparencyDocument {
   name: string;
   category: string;
   year: string;
+  month?: string;
   url: string;
   upload_date: string;
   author_id: number;
@@ -141,6 +142,15 @@ export const api = {
       body: JSON.stringify(doc)
     });
     if (!res.ok) throw new Error('Erro ao enviar documento');
+    return res.json();
+  },
+
+  async deleteDocument(id: number) {
+    const res = await fetch(`${API_URL}/api/documents/${id}`, {
+      method: 'DELETE',
+      headers: getHeaders()
+    });
+    if (!res.ok) throw new Error('Erro ao remover documento');
     return res.json();
   },
 

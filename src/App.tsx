@@ -125,6 +125,11 @@ const transparencyCategories = [
   'TERCEIRIZADOS'
 ];
 
+const MONTHS = [
+  'JANEIRO', 'FEVEREIRO', 'MARÇO', 'ABRIL', 'MAIO', 'JUNHO',
+  'JULHO', 'AGOSTO', 'SETEMBRO', 'OUTUBRO', 'NOVEMBRO', 'DEZEMBRO'
+];
+
 export default function App() {
   const [showTransparenciaSub, setShowTransparenciaSub] = useState(false);
   const [openLevel2Menu, setOpenLevel2Menu] = useState<string | null>(null);
@@ -137,6 +142,7 @@ export default function App() {
   const [adminTab, setAdminTab] = useState<'publish' | 'users' | 'documents' | 'settings'>('publish');
   const [selectedFolder, setSelectedFolder] = useState<{ label: string, items: any[] } | null>(null);
   const [selectedYear, setSelectedYear] = useState<string | null>(null);
+  const [selectedMonth, setSelectedMonth] = useState<string | null>(null);
   
   // Institutional State
   const [presidencia, setPresidencia] = useState<Presidencia | null>(null);
@@ -151,6 +157,7 @@ export default function App() {
   const [isUploadingDocs, setIsUploadingDocs] = useState(false);
   const [uploadCategory, setUploadCategory] = useState('BALANÇO FINANCEIRO');
   const [uploadYear, setUploadYear] = useState('2026');
+  const [uploadMonth, setUploadMonth] = useState('JANEIRO');
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   
   // Auth State
@@ -517,6 +524,7 @@ export default function App() {
           name: file.name,
           category: uploadCategory,
           year: uploadYear,
+          month: ['ESTAGIÁRIOS', 'FOLHA DE PAGAMENTO', 'TERCEIRIZADOS'].includes(uploadCategory) ? uploadMonth : undefined,
           url: uploadRes.url
         });
       }
@@ -531,6 +539,16 @@ export default function App() {
     } catch (error) {
       setIsUploadingDocs(false);
       toast.error('Erro ao enviar documentos');
+    }
+  };
+
+  const handleDeleteDocument = async (id: number) => {
+    try {
+      await api.deleteDocument(id);
+      setDocuments(prev => prev.filter(doc => doc.id !== id));
+      toast.success('Documento removido com sucesso!');
+    } catch (error) {
+      toast.error('Erro ao remover documento');
     }
   };
 
@@ -802,33 +820,93 @@ export default function App() {
           label: 'ESTAGIÁRIOS', 
           icon: UserRound,
           subItems: [
-            { label: '2026', icon: Calendar },
-            { label: '2025', icon: Calendar },
-            { label: '2024', icon: Calendar },
-            { label: '2023', icon: Calendar },
-            { label: '2022', icon: Calendar }
+            { 
+              label: '2026', 
+              icon: Calendar,
+              subItems: MONTHS.map(m => ({ label: m, icon: Clock }))
+            },
+            { 
+              label: '2025', 
+              icon: Calendar,
+              subItems: MONTHS.map(m => ({ label: m, icon: Clock }))
+            },
+            { 
+              label: '2024', 
+              icon: Calendar,
+              subItems: MONTHS.map(m => ({ label: m, icon: Clock }))
+            },
+            { 
+              label: '2023', 
+              icon: Calendar,
+              subItems: MONTHS.map(m => ({ label: m, icon: Clock }))
+            },
+            { 
+              label: '2022', 
+              icon: Calendar,
+              subItems: MONTHS.map(m => ({ label: m, icon: Clock }))
+            }
           ]
         },
         { 
           label: 'FOLHA DE PAGAMENTO', 
           icon: FileText,
           subItems: [
-            { label: '2026', icon: Calendar },
-            { label: '2025', icon: Calendar },
-            { label: '2024', icon: Calendar },
-            { label: '2023', icon: Calendar },
-            { label: '2022', icon: Calendar }
+            { 
+              label: '2026', 
+              icon: Calendar,
+              subItems: MONTHS.map(m => ({ label: m, icon: Clock }))
+            },
+            { 
+              label: '2025', 
+              icon: Calendar,
+              subItems: MONTHS.map(m => ({ label: m, icon: Clock }))
+            },
+            { 
+              label: '2024', 
+              icon: Calendar,
+              subItems: MONTHS.map(m => ({ label: m, icon: Clock }))
+            },
+            { 
+              label: '2023', 
+              icon: Calendar,
+              subItems: MONTHS.map(m => ({ label: m, icon: Clock }))
+            },
+            { 
+              label: '2022', 
+              icon: Calendar,
+              subItems: MONTHS.map(m => ({ label: m, icon: Clock }))
+            }
           ]
         },
         { 
           label: 'TERCEIRIZADOS', 
           icon: Handshake,
           subItems: [
-            { label: '2026', icon: Calendar },
-            { label: '2025', icon: Calendar },
-            { label: '2024', icon: Calendar },
-            { label: '2023', icon: Calendar },
-            { label: '2022', icon: Calendar }
+            { 
+              label: '2026', 
+              icon: Calendar,
+              subItems: MONTHS.map(m => ({ label: m, icon: Clock }))
+            },
+            { 
+              label: '2025', 
+              icon: Calendar,
+              subItems: MONTHS.map(m => ({ label: m, icon: Clock }))
+            },
+            { 
+              label: '2024', 
+              icon: Calendar,
+              subItems: MONTHS.map(m => ({ label: m, icon: Clock }))
+            },
+            { 
+              label: '2023', 
+              icon: Calendar,
+              subItems: MONTHS.map(m => ({ label: m, icon: Clock }))
+            },
+            { 
+              label: '2022', 
+              icon: Calendar,
+              subItems: MONTHS.map(m => ({ label: m, icon: Clock }))
+            }
           ]
         }
       ]
@@ -1676,7 +1754,9 @@ export default function App() {
             <div className="flex items-center gap-4 mb-8">
               <button 
                 onClick={() => {
-                  if (selectedYear) {
+                  if (selectedMonth) {
+                    setSelectedMonth(null);
+                  } else if (selectedYear) {
                     setSelectedYear(null);
                   } else {
                     setCurrentPage('home');
@@ -1710,17 +1790,45 @@ export default function App() {
                   </motion.div>
                 ))}
               </div>
+            ) : (selectedFolder.items.find(i => i.label === selectedYear)?.subItems && !selectedMonth) ? (
+              <div className="grid grid-cols-2 gap-4">
+                {selectedFolder.items.find(i => i.label === selectedYear)?.subItems?.map((month: any) => (
+                  <motion.div
+                    key={month.label}
+                    onClick={() => setSelectedMonth(month.label)}
+                    whileHover={{ y: -4 }}
+                    whileTap={{ scale: 0.95 }}
+                    className="bg-white p-6 rounded-[2rem] shadow-[0_8px_32px_rgba(0,34,2,0.06)] border border-primary/5 flex flex-col items-center justify-center text-center gap-3 cursor-pointer group hover:border-primary/20 transition-all"
+                  >
+                    <div className="w-12 h-12 bg-primary/5 rounded-2xl flex items-center justify-center text-primary group-hover:bg-primary/10 transition-colors">
+                      <Clock className="w-6 h-6" />
+                    </div>
+                    <span className="font-headline font-bold text-primary text-xs uppercase tracking-wider">{month.label}</span>
+                  </motion.div>
+                ))}
+              </div>
             ) : (
               <div className="space-y-6">
                 <div className="flex items-center justify-between mb-4">
-                  <span className="bg-primary/10 text-primary px-4 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-wider">
-                    Ano: {selectedYear}
-                  </span>
+                  <div className="flex gap-2">
+                    <span className="bg-primary/10 text-primary px-4 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-wider">
+                      Ano: {selectedYear}
+                    </span>
+                    {selectedMonth && (
+                      <span className="bg-primary/10 text-primary px-4 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-wider">
+                        Mês: {selectedMonth}
+                      </span>
+                    )}
+                  </div>
                 </div>
 
                 <div className="grid gap-3">
                   {documents
-                    .filter(doc => doc.category === selectedFolder.label && doc.year === selectedYear)
+                    .filter(doc => 
+                      doc.category === selectedFolder.label && 
+                      doc.year === selectedYear &&
+                      (!selectedMonth || doc.month === selectedMonth)
+                    )
                     .map(doc => (
                       <div key={doc.id} className="bg-white p-4 rounded-2xl border border-primary/5 flex items-center justify-between group hover:border-primary/20 transition-all shadow-sm">
                         <div className="flex items-center gap-4">
@@ -1734,17 +1842,32 @@ export default function App() {
                             </span>
                           </div>
                         </div>
-                        <a 
-                          href={doc.url} 
-                          target="_blank" 
-                          rel="noopener noreferrer"
-                          className="p-2 text-primary hover:bg-primary/5 rounded-full transition-all"
-                        >
-                          <Download className="w-5 h-5" />
-                        </a>
+                        <div className="flex items-center gap-2">
+                          <a 
+                            href={doc.url} 
+                            target="_blank" 
+                            rel="noopener noreferrer"
+                            className="p-2 text-primary hover:bg-primary/5 rounded-full transition-all"
+                          >
+                            <Download className="w-5 h-5" />
+                          </a>
+                          {(user?.role === 'admin' || user?.role === 'editor') && (
+                            <button 
+                              onClick={() => handleDeleteDocument(doc.id)}
+                              className="p-2 text-red-500 hover:bg-red-50 rounded-full transition-all"
+                              title="Excluir Documento"
+                            >
+                              <Trash2 className="w-5 h-5" />
+                            </button>
+                          )}
+                        </div>
                       </div>
                     ))}
-                  {documents.filter(doc => doc.category === selectedFolder.label && doc.year === selectedYear).length === 0 && (
+                  {documents.filter(doc => 
+                    doc.category === selectedFolder.label && 
+                    doc.year === selectedYear &&
+                    (!selectedMonth || doc.month === selectedMonth)
+                  ).length === 0 && (
                     <div className="text-center py-12 bg-surface-container-low rounded-3xl border border-dashed border-primary/20">
                       <File className="w-12 h-12 mx-auto mb-4 opacity-10 text-primary" />
                       <p className="text-xs text-secondary font-medium">Nenhum documento encontrado para este período.</p>
@@ -2157,17 +2280,33 @@ export default function App() {
                             ))}
                           </select>
                         </div>
-                        <div>
-                          <label className="block text-[10px] font-bold text-secondary uppercase tracking-widest mb-1.5 ml-1">Ano</label>
-                          <select 
-                            value={uploadYear}
-                            onChange={(e) => setUploadYear(e.target.value)}
-                            className="w-full bg-surface-container-low border-none rounded-2xl px-4 py-3 text-sm focus:ring-2 focus:ring-primary transition-all"
-                          >
-                            {['2022', '2023', '2024', '2025', '2026'].map(y => (
-                              <option key={y} value={y}>{y}</option>
-                            ))}
-                          </select>
+                        <div className="grid grid-cols-2 gap-2">
+                          <div>
+                            <label className="block text-[10px] font-bold text-secondary uppercase tracking-widest mb-1.5 ml-1">Ano</label>
+                            <select 
+                              value={uploadYear}
+                              onChange={(e) => setUploadYear(e.target.value)}
+                              className="w-full bg-surface-container-low border-none rounded-2xl px-4 py-3 text-sm focus:ring-2 focus:ring-primary transition-all"
+                            >
+                              {['2022', '2023', '2024', '2025', '2026'].map(y => (
+                                <option key={y} value={y}>{y}</option>
+                              ))}
+                            </select>
+                          </div>
+                          {['ESTAGIÁRIOS', 'FOLHA DE PAGAMENTO', 'TERCEIRIZADOS'].includes(uploadCategory) && (
+                            <div>
+                              <label className="block text-[10px] font-bold text-secondary uppercase tracking-widest mb-1.5 ml-1">Mês</label>
+                              <select 
+                                value={uploadMonth}
+                                onChange={(e) => setUploadMonth(e.target.value)}
+                                className="w-full bg-surface-container-low border-none rounded-2xl px-4 py-3 text-sm focus:ring-2 focus:ring-primary transition-all"
+                              >
+                                {MONTHS.map(m => (
+                                  <option key={m} value={m}>{m}</option>
+                                ))}
+                              </select>
+                            </div>
+                          )}
                         </div>
                       </div>
 
@@ -2576,18 +2715,18 @@ export default function App() {
           >
             {presidencia ? (
               <div className="bg-white rounded-[2.5rem] shadow-xl border border-primary/5 overflow-hidden">
-                <div className="md:flex">
-                  <div className="md:w-1/3 p-8">
-                    <div className="aspect-square rounded-3xl overflow-hidden shadow-lg border-4 border-primary/10">
+                <div className="md:flex items-center">
+                  <div className="md:w-2/5 p-8">
+                    <div className="aspect-[4/5] rounded-3xl overflow-hidden shadow-lg border-4 border-primary/10 bg-surface-container-low">
                       <img 
                         src={presidencia.photo_url} 
                         alt={presidencia.name} 
-                        className="w-full h-full object-cover"
+                        className="w-full h-full object-cover object-top"
                         referrerPolicy="no-referrer"
                       />
                     </div>
                   </div>
-                  <div className="md:w-2/3 p-8 md:pl-0">
+                  <div className="md:w-3/5 p-8 md:pl-0">
                     <h1 className="text-3xl font-black text-primary font-headline mb-2 uppercase">{presidencia.name}</h1>
                     <div className="h-1 w-20 bg-primary rounded-full mb-6" />
                     <div className="prose prose-sm max-w-none text-secondary leading-relaxed whitespace-pre-wrap">
@@ -2615,14 +2754,14 @@ export default function App() {
               <div className="h-1 w-20 bg-primary rounded-full mx-auto" />
             </div>
             
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-10">
               {diretorias.map((dir) => (
-                <div key={dir.id} className="bg-white rounded-[2rem] shadow-lg border border-primary/5 overflow-hidden group hover:shadow-2xl transition-all duration-500">
-                  <div className="aspect-square overflow-hidden relative">
+                <div key={dir.id} className="bg-white rounded-[2.5rem] shadow-lg border border-primary/5 overflow-hidden group hover:shadow-2xl transition-all duration-500">
+                  <div className="aspect-[4/5] overflow-hidden relative bg-surface-container-low">
                     <img 
                       src={dir.photo_url} 
                       alt={dir.director_name} 
-                      className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700"
+                      className="w-full h-full object-cover object-top group-hover:scale-110 transition-transform duration-700"
                       referrerPolicy="no-referrer"
                     />
                     <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
@@ -2648,14 +2787,14 @@ export default function App() {
               <div className="h-1 w-20 bg-primary rounded-full mx-auto" />
             </div>
             
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-8">
               {galeria.map((p) => (
-                <div key={p.id} className="bg-white rounded-3xl shadow-md border border-primary/5 overflow-hidden group hover:shadow-xl transition-all">
-                  <div className="aspect-[3/4] overflow-hidden">
+                <div key={p.id} className="bg-white rounded-[2rem] shadow-md border border-primary/5 overflow-hidden group hover:shadow-xl transition-all">
+                  <div className="aspect-[2/3] overflow-hidden bg-surface-container-low">
                     <img 
                       src={p.photo_url} 
                       alt={p.name} 
-                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                      className="w-full h-full object-cover object-top group-hover:scale-105 transition-transform duration-500"
                       referrerPolicy="no-referrer"
                     />
                   </div>
