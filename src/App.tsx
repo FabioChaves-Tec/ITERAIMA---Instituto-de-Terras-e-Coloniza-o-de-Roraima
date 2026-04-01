@@ -48,12 +48,14 @@ import {
   Download,
   ShieldCheck,
   ShieldAlert,
-  UserPlus
+  UserPlus,
+  Settings,
+  Lock,
 } from 'lucide-react';
 import { Toaster, toast } from 'sonner';
 import { motion, AnimatePresence } from 'motion/react';
 import React, { useState, useEffect, FormEvent, Component, ErrorInfo, ReactNode } from 'react';
-import { api, User, News, TransparencyDocument } from './api';
+import { api, User, News, TransparencyDocument, Presidencia, Diretoria, GaleriaPresidente } from './api';
 
 // Error Boundary Component
 class ErrorBoundary extends Component<any, any> {
@@ -121,11 +123,15 @@ export default function App() {
   const [showInstitucionalSub, setShowInstitucionalSub] = useState(false);
   const [showLegislacaoSub, setShowLegislacaoSub] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-  const [currentPage, setCurrentPage] = useState<'home' | 'news' | 'admin' | 'folder'>('home');
-  const [adminTab, setAdminTab] = useState<'publish' | 'users' | 'documents'>('publish');
+  const [currentPage, setCurrentPage] = useState<'home' | 'news' | 'admin' | 'folder' | 'presidencia' | 'diretorias' | 'galeria'>('home');
+  const [adminTab, setAdminTab] = useState<'publish' | 'users' | 'documents' | 'settings'>('publish');
   const [selectedFolder, setSelectedFolder] = useState<{ label: string, items: any[] } | null>(null);
   const [selectedYear, setSelectedYear] = useState<string | null>(null);
   
+  // Institutional State
+  const [presidencia, setPresidencia] = useState<Presidencia | null>(null);
+  const [diretorias, setDiretorias] = useState<Diretoria[]>([]);
+  const [galeria, setGaleria] = useState<GaleriaPresidente[]>([]);
   // News State
   const [newsList, setNewsList] = useState<News[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -149,6 +155,32 @@ export default function App() {
   // Admin State
   const [pendingUsers, setPendingUsers] = useState<User[]>([]);
   const [allUsers, setAllUsers] = useState<User[]>([]);
+  const [coverPhotoUrl, setCoverPhotoUrl] = useState(IMAGES.hero);
+  const [isUpdatingCover, setIsUpdatingCover] = useState(false);
+
+  // Password Change State
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [isChangingPassword, setIsChangingPassword] = useState(false);
+  const [passwordChangeSuccess, setPasswordChangeSuccess] = useState(false);
+  const [passwordChangeError, setPasswordChangeError] = useState('');
+
+  // Institutional Admin State
+  const [isUpdatingPresidencia, setIsUpdatingPresidencia] = useState(false);
+  const [presName, setPresName] = useState('');
+  const [presBio, setPresBio] = useState('');
+  const [presPhoto, setPresPhoto] = useState<File | null>(null);
+
+  const [isAddingDiretoria, setIsAddingDiretoria] = useState(false);
+  const [dirName, setDirName] = useState('');
+  const [dirDirector, setDirDirector] = useState('');
+  const [dirPhoto, setDirPhoto] = useState<File | null>(null);
+
+  const [isAddingGaleria, setIsAddingGaleria] = useState(false);
+  const [galName, setGalName] = useState('');
+  const [galPeriod, setGalPeriod] = useState('');
+  const [galPhoto, setGalPhoto] = useState<File | null>(null);
 
   // Publish State
   const [newTitle, setNewTitle] = useState('');
@@ -168,19 +200,31 @@ export default function App() {
     const savedUser = localStorage.getItem('user');
     const token = localStorage.getItem('token');
     if (savedUser && token) {
-      setUser(JSON.parse(savedUser));
+      const parsedUser = JSON.parse(savedUser);
+      setUser(parsedUser);
+      if (parsedUser.role === 'viewer') {
+        setAdminTab('settings');
+      }
     }
     setIsAuthReady(true);
 
     // Initial data fetch
     const fetchData = async () => {
       try {
-        const [news, docs] = await Promise.all([
+        const [news, docs, cover, pres, dir, gal] = await Promise.all([
           api.getNews(),
-          api.getDocuments()
+          api.getDocuments(),
+          api.getCoverPhoto(),
+          api.getPresidencia(),
+          api.getDiretorias(),
+          api.getGaleria()
         ]);
         setNewsList(news);
         setDocuments(docs);
+        if (cover.url) setCoverPhotoUrl(cover.url);
+        setPresidencia(pres);
+        setDiretorias(dir);
+        setGaleria(gal);
       } catch (error) {
         console.error("Error fetching initial data:", error);
       } finally {
@@ -226,6 +270,96 @@ export default function App() {
     }
   }, [user]);
 
+  useEffect(() => {
+    if (presidencia) {
+      setPresName(presidencia.name);
+      setPresBio(presidencia.biography);
+    }
+  }, [presidencia]);
+
+  const handleUpdatePresidencia = async (e: FormEvent) => {
+    e.preventDefault();
+    if (!user || (user.role !== 'admin' && user.role !== 'editor')) return;
+    setIsUpdatingPresidencia(true);
+    try {
+      let photoUrl = presidencia?.photo_url || '';
+      if (presPhoto) {
+        const res = await api.uploadFile(presPhoto);
+        photoUrl = res.url;
+      }
+      await api.updatePresidencia({ name: presName, photo_url: photoUrl, biography: presBio });
+      const updated = await api.getPresidencia();
+      setPresidencia(updated);
+      toast.success('Informações da presidência atualizadas');
+    } catch (err) {
+      toast.error('Erro ao atualizar presidência');
+    } finally {
+      setIsUpdatingPresidencia(false);
+    }
+  };
+
+  const handleAddDiretoria = async (e: FormEvent) => {
+    e.preventDefault();
+    if (!user || (user.role !== 'admin' && user.role !== 'editor')) return;
+    if (!dirPhoto) return toast.error('Selecione uma foto');
+    setIsAddingDiretoria(true);
+    try {
+      const res = await api.uploadFile(dirPhoto);
+      await api.addDiretoria({ name: dirName, director_name: dirDirector, photo_url: res.url });
+      const updated = await api.getDiretorias();
+      setDiretorias(updated);
+      setDirName('');
+      setDirDirector('');
+      setDirPhoto(null);
+      toast.success('Diretoria adicionada com sucesso');
+    } catch (err) {
+      toast.error('Erro ao adicionar diretoria');
+    } finally {
+      setIsAddingDiretoria(false);
+    }
+  };
+
+  const handleDeleteDiretoria = async (id: number) => {
+    try {
+      await api.deleteDiretoria(id);
+      setDiretorias(prev => prev.filter(d => d.id !== id));
+      toast.success('Diretoria removida');
+    } catch (err) {
+      toast.error('Erro ao remover diretoria');
+    }
+  };
+
+  const handleAddGaleria = async (e: FormEvent) => {
+    e.preventDefault();
+    if (!user || (user.role !== 'admin' && user.role !== 'editor')) return;
+    if (!galPhoto) return toast.error('Selecione uma foto');
+    setIsAddingGaleria(true);
+    try {
+      const res = await api.uploadFile(galPhoto);
+      await api.addGaleria({ name: galName, period: galPeriod, photo_url: res.url });
+      const updated = await api.getGaleria();
+      setGaleria(updated);
+      setGalName('');
+      setGalPeriod('');
+      setGalPhoto(null);
+      toast.success('Presidente adicionado à galeria');
+    } catch (err) {
+      toast.error('Erro ao adicionar à galeria');
+    } finally {
+      setIsAddingGaleria(false);
+    }
+  };
+
+  const handleDeleteGaleria = async (id: number) => {
+    try {
+      await api.deleteGaleria(id);
+      setGaleria(prev => prev.filter(g => g.id !== id));
+      toast.success('Removido da galeria');
+    } catch (err) {
+      toast.error('Erro ao remover da galeria');
+    }
+  };
+
   const handleLogin = async (e: FormEvent) => {
     e.preventDefault();
     setLoginError('');
@@ -234,6 +368,11 @@ export default function App() {
       localStorage.setItem('token', data.token);
       localStorage.setItem('user', JSON.stringify(data.user));
       setUser(data.user);
+      if (data.user.role === 'viewer') {
+        setAdminTab('settings');
+      } else {
+        setAdminTab('publish');
+      }
       setLoginEmail('');
       setLoginPassword('');
     } catch (error: any) {
@@ -363,11 +502,12 @@ export default function App() {
     
     try {
       for (const file of selectedFiles) {
+        const uploadRes = await api.uploadFile(file);
         await api.uploadDocument({
           name: file.name,
           category: uploadCategory,
           year: uploadYear,
-          url: '#' // Placeholder
+          url: uploadRes.url
         });
       }
       
@@ -381,6 +521,45 @@ export default function App() {
     } catch (error) {
       setIsUploadingDocs(false);
       toast.error('Erro ao enviar documentos');
+    }
+  };
+
+  const handleChangePassword = async (e: FormEvent) => {
+    e.preventDefault();
+    if (newPassword !== confirmPassword) {
+      setPasswordChangeError('As senhas não coincidem');
+      return;
+    }
+    
+    setIsChangingPassword(true);
+    setPasswordChangeError('');
+    setPasswordChangeSuccess(false);
+    
+    try {
+      await api.changePassword(currentPassword, newPassword);
+      setPasswordChangeSuccess(true);
+      setCurrentPassword('');
+      setNewPassword('');
+      setConfirmPassword('');
+      setTimeout(() => setPasswordChangeSuccess(false), 3000);
+    } catch (error: any) {
+      setPasswordChangeError(error.message);
+    } finally {
+      setIsChangingPassword(false);
+    }
+  };
+
+  const handleUpdateCover = async (file: File) => {
+    setIsUpdatingCover(true);
+    try {
+      const uploadRes = await api.uploadFile(file);
+      await api.updateCoverPhoto(uploadRes.url);
+      setCoverPhotoUrl(uploadRes.url);
+      toast.success('Foto de capa atualizada!');
+    } catch (error) {
+      toast.error('Erro ao atualizar foto de capa');
+    } finally {
+      setIsUpdatingCover(false);
     }
   };
 
@@ -830,6 +1009,12 @@ export default function App() {
                         {institucionalItems.map((item) => (
                           <button 
                             key={item.label}
+                            onClick={() => {
+                              if (item.label === 'PRESIDÊNCIA') setCurrentPage('presidencia');
+                              if (item.label === 'DIRETORIAS') setCurrentPage('diretorias');
+                              if (item.label === 'GALERIA DE PRESIDENTES') setCurrentPage('galeria');
+                              setIsSidebarOpen(false);
+                            }}
                             className="flex items-center gap-3 p-3 rounded-xl hover:bg-primary/5 text-primary text-xs font-bold transition-colors text-left"
                           >
                             <item.icon className="w-4 h-4 opacity-60" />
@@ -954,10 +1139,10 @@ export default function App() {
             {/* Hero Section */}
             <section className="relative h-[480px] w-full flex items-end p-8 overflow-hidden">
               <div className="absolute inset-0 z-0">
-                <a href={IMAGES.hero} target="_blank" rel="noopener noreferrer" className="block w-full h-full group">
+                <a href={coverPhotoUrl} target="_blank" rel="noopener noreferrer" className="block w-full h-full group">
                   <img 
                     className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" 
-                    src={IMAGES.hero} 
+                    src={coverPhotoUrl} 
                     alt="Aerial view of Roraima rainforest"
                     referrerPolicy="no-referrer"
                   />
@@ -1193,6 +1378,13 @@ export default function App() {
                         {institucionalItems.map((sub) => (
                           <button 
                             key={sub.label}
+                            onClick={() => {
+                              if (sub.label === 'PRESIDÊNCIA') setCurrentPage('presidencia');
+                              if (sub.label === 'DIRETORIAS') setCurrentPage('diretorias');
+                              if (sub.label === 'GALERIA DE PRESIDENTES') setCurrentPage('galeria');
+                              setShowInstitucionalSub(false);
+                              scrollToTop();
+                            }}
                             className="flex items-center gap-3 p-3 rounded-2xl hover:bg-primary/5 text-primary text-xs font-bold transition-colors text-left"
                           >
                             <div className="w-8 h-8 bg-primary/10 rounded-full flex items-center justify-center">
@@ -1622,16 +1814,18 @@ export default function App() {
                 </div>
 
                 {/* Admin Tabs */}
-                {(user?.role === 'admin' || user?.role === 'editor') && (
+                {user && (
                   <div className="flex gap-2 mb-8 bg-white p-1.5 rounded-2xl shadow-sm border border-primary/5">
-                    <button 
-                      onClick={() => setAdminTab('publish')}
-                      className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl font-bold text-xs transition-all ${adminTab === 'publish' ? 'bg-primary text-white shadow-lg shadow-primary/20' : 'text-secondary hover:bg-primary/5'}`}
-                    >
-                      <Newspaper className="w-4 h-4" />
-                      NOTÍCIAS
-                    </button>
-                    {user?.role === 'admin' && (
+                    {(user.role === 'admin' || user.role === 'editor') && (
+                      <button 
+                        onClick={() => setAdminTab('publish')}
+                        className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl font-bold text-xs transition-all ${adminTab === 'publish' ? 'bg-primary text-white shadow-lg shadow-primary/20' : 'text-secondary hover:bg-primary/5'}`}
+                      >
+                        <Newspaper className="w-4 h-4" />
+                        NOTÍCIAS
+                      </button>
+                    )}
+                    {user.role === 'admin' && (
                       <button 
                         onClick={() => setAdminTab('users')}
                         className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl font-bold text-xs transition-all ${adminTab === 'users' ? 'bg-primary text-white shadow-lg shadow-primary/20' : 'text-secondary hover:bg-primary/5'}`}
@@ -1645,12 +1839,21 @@ export default function App() {
                         )}
                       </button>
                     )}
+                    {(user.role === 'admin' || user.role === 'editor') && (
+                      <button 
+                        onClick={() => setAdminTab('documents')}
+                        className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl font-bold text-xs transition-all ${adminTab === 'documents' ? 'bg-primary text-white shadow-lg shadow-primary/20' : 'text-secondary hover:bg-primary/5'}`}
+                      >
+                        <Folder className="w-4 h-4" />
+                        DOCUMENTOS
+                      </button>
+                    )}
                     <button 
-                      onClick={() => setAdminTab('documents')}
-                      className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl font-bold text-xs transition-all ${adminTab === 'documents' ? 'bg-primary text-white shadow-lg shadow-primary/20' : 'text-secondary hover:bg-primary/5'}`}
+                      onClick={() => setAdminTab('settings')}
+                      className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl font-bold text-xs transition-all ${adminTab === 'settings' ? 'bg-primary text-white shadow-lg shadow-primary/20' : 'text-secondary hover:bg-primary/5'}`}
                     >
-                      <Folder className="w-4 h-4" />
-                      DOCUMENTOS
+                      <Settings className="w-4 h-4" />
+                      CONFIGURAÇÕES
                     </button>
                   </div>
                 )}
@@ -1979,8 +2182,440 @@ export default function App() {
                     </div>
                   </div>
                 )}
+
+                {adminTab === 'settings' && (
+                  <div className="space-y-8">
+                    {/* Change Password Section */}
+                    <div className="bg-white p-8 rounded-3xl shadow-xl border border-primary/5">
+                      <div className="flex items-center gap-4 mb-8">
+                        <div className="w-12 h-12 bg-primary/10 rounded-2xl flex items-center justify-center text-primary">
+                          <Lock className="w-6 h-6" />
+                        </div>
+                        <div>
+                          <h3 className="text-2xl font-black text-on-surface font-headline leading-none">Alterar Senha</h3>
+                          <p className="text-xs text-secondary mt-1">Mantenha sua conta segura atualizando sua senha</p>
+                        </div>
+                      </div>
+
+                      <form onSubmit={handleChangePassword} className="space-y-4 max-w-md">
+                        <div>
+                          <label className="block text-[10px] font-bold text-secondary uppercase tracking-widest mb-1.5 ml-1">Senha Atual</label>
+                          <input 
+                            type="password" 
+                            value={currentPassword}
+                            onChange={(e) => setCurrentPassword(e.target.value)}
+                            className="w-full bg-surface-container-low border-none rounded-2xl px-4 py-3 text-sm focus:ring-2 focus:ring-primary transition-all"
+                            required
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-[10px] font-bold text-secondary uppercase tracking-widest mb-1.5 ml-1">Nova Senha</label>
+                          <input 
+                            type="password" 
+                            value={newPassword}
+                            onChange={(e) => setNewPassword(e.target.value)}
+                            className="w-full bg-surface-container-low border-none rounded-2xl px-4 py-3 text-sm focus:ring-2 focus:ring-primary transition-all"
+                            required
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-[10px] font-bold text-secondary uppercase tracking-widest mb-1.5 ml-1">Confirmar Nova Senha</label>
+                          <input 
+                            type="password" 
+                            value={confirmPassword}
+                            onChange={(e) => setConfirmPassword(e.target.value)}
+                            className="w-full bg-surface-container-low border-none rounded-2xl px-4 py-3 text-sm focus:ring-2 focus:ring-primary transition-all"
+                            required
+                          />
+                        </div>
+
+                        {passwordChangeError && (
+                          <p className="text-red-500 text-xs font-bold">{passwordChangeError}</p>
+                        )}
+                        {passwordChangeSuccess && (
+                          <p className="text-green-600 text-xs font-bold">Senha alterada com sucesso!</p>
+                        )}
+
+                        <button 
+                          type="submit"
+                          disabled={isChangingPassword}
+                          className={`w-full ${isChangingPassword ? 'bg-gray-400' : 'bg-primary'} text-white font-bold py-4 rounded-2xl shadow-lg shadow-primary/20 active:scale-95 transition-all flex items-center justify-center gap-2`}
+                        >
+                          {isChangingPassword ? 'ALTERANDO...' : 'ATUALIZAR SENHA'}
+                        </button>
+                      </form>
+                    </div>
+
+                    {/* Change Cover Photo Section (Admin & Editor) */}
+                    {(user?.role === 'admin' || user?.role === 'editor') && (
+                      <div className="bg-white p-8 rounded-3xl shadow-xl border border-primary/5">
+                        <div className="flex items-center gap-4 mb-8">
+                          <div className="w-12 h-12 bg-primary/10 rounded-2xl flex items-center justify-center text-primary">
+                            <Image className="w-6 h-6" />
+                          </div>
+                          <div>
+                            <h3 className="text-2xl font-black text-on-surface font-headline leading-none">Foto de Capa</h3>
+                            <p className="text-xs text-secondary mt-1">Altere a imagem principal da página inicial</p>
+                          </div>
+                        </div>
+
+                        <div className="space-y-6">
+                          <div className="aspect-video w-full max-w-2xl rounded-3xl overflow-hidden border border-primary/10 bg-surface-container-low">
+                            <img 
+                              src={coverPhotoUrl} 
+                              alt="Capa Atual" 
+                              className="w-full h-full object-cover"
+                              referrerPolicy="no-referrer"
+                            />
+                          </div>
+
+                          <div className="flex items-center gap-4">
+                            <input 
+                              type="file" 
+                              accept="image/*"
+                              id="cover-upload"
+                              className="hidden"
+                              onChange={(e) => {
+                                if (e.target.files?.[0]) {
+                                  handleUpdateCover(e.target.files[0]);
+                                }
+                              }}
+                            />
+                            <button 
+                              onClick={() => document.getElementById('cover-upload')?.click()}
+                              disabled={isUpdatingCover}
+                              className={`bg-primary text-white font-bold px-6 py-3 rounded-2xl shadow-lg shadow-primary/20 active:scale-95 transition-all flex items-center gap-2 text-xs uppercase tracking-widest ${isUpdatingCover ? 'opacity-50 cursor-not-allowed' : ''}`}
+                            >
+                              {isUpdatingCover ? (
+                                <>
+                                  <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                                  ATUALIZANDO...
+                                </>
+                              ) : (
+                                <>
+                                  <Upload className="w-4 h-4" />
+                                  ALTERAR FOTO DE CAPA
+                                </>
+                              )}
+                            </button>
+                          </div>
+                          <p className="text-[10px] text-secondary font-medium uppercase tracking-widest">Recomendado: 1920x1080px (Máx. 5MB)</p>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Institutional Management (Admin & Editor) */}
+                    {(user?.role === 'admin' || user?.role === 'editor') && (
+                      <div className="space-y-8">
+                        {/* Presidencia Management */}
+                        <div className="bg-white p-8 rounded-3xl shadow-xl border border-primary/5">
+                          <div className="flex items-center gap-4 mb-8">
+                            <div className="w-12 h-12 bg-primary/10 rounded-2xl flex items-center justify-center text-primary">
+                              <UserRound className="w-6 h-6" />
+                            </div>
+                            <div>
+                              <h3 className="text-2xl font-black text-on-surface font-headline leading-none">Gerenciar Presidência</h3>
+                              <p className="text-xs text-secondary mt-1">Atualize o nome, foto e biografia do presidente atual</p>
+                            </div>
+                          </div>
+
+                          <form onSubmit={handleUpdatePresidencia} className="space-y-6">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                              <div className="space-y-4">
+                                <div>
+                                  <label className="block text-[10px] font-bold text-secondary uppercase tracking-widest mb-1.5 ml-1">Nome do Presidente</label>
+                                  <input 
+                                    type="text" 
+                                    value={presName}
+                                    onChange={(e) => setPresName(e.target.value)}
+                                    className="w-full bg-surface-container-low border-none rounded-2xl px-4 py-3 text-sm focus:ring-2 focus:ring-primary transition-all"
+                                    required
+                                  />
+                                </div>
+                                <div>
+                                  <label className="block text-[10px] font-bold text-secondary uppercase tracking-widest mb-1.5 ml-1">Foto do Presidente</label>
+                                  <input 
+                                    type="file" 
+                                    accept="image/*"
+                                    onChange={(e) => setPresPhoto(e.target.files?.[0] || null)}
+                                    className="w-full bg-surface-container-low border-none rounded-2xl px-4 py-3 text-sm focus:ring-2 focus:ring-primary transition-all"
+                                  />
+                                </div>
+                              </div>
+                              <div>
+                                <label className="block text-[10px] font-bold text-secondary uppercase tracking-widest mb-1.5 ml-1">Biografia</label>
+                                <textarea 
+                                  value={presBio}
+                                  onChange={(e) => setPresBio(e.target.value)}
+                                  rows={6}
+                                  className="w-full bg-surface-container-low border-none rounded-2xl px-4 py-3 text-sm focus:ring-2 focus:ring-primary transition-all resize-none"
+                                  required
+                                />
+                              </div>
+                            </div>
+                            <button 
+                              type="submit"
+                              disabled={isUpdatingPresidencia}
+                              className={`w-full ${isUpdatingPresidencia ? 'bg-gray-400' : 'bg-primary'} text-white font-bold py-4 rounded-2xl shadow-lg shadow-primary/20 active:scale-95 transition-all flex items-center justify-center gap-2`}
+                            >
+                              {isUpdatingPresidencia ? 'ATUALIZANDO...' : 'SALVAR ALTERAÇÕES'}
+                            </button>
+                          </form>
+                        </div>
+
+                        {/* Diretorias Management */}
+                        <div className="bg-white p-8 rounded-3xl shadow-xl border border-primary/5">
+                          <div className="flex items-center gap-4 mb-8">
+                            <div className="w-12 h-12 bg-primary/10 rounded-2xl flex items-center justify-center text-primary">
+                              <UsersRound className="w-6 h-6" />
+                            </div>
+                            <div>
+                              <h3 className="text-2xl font-black text-on-surface font-headline leading-none">Gerenciar Diretorias</h3>
+                              <p className="text-xs text-secondary mt-1">Adicione ou remova diretorias e seus respectivos diretores</p>
+                            </div>
+                          </div>
+
+                          <form onSubmit={handleAddDiretoria} className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8 bg-surface-container-low p-6 rounded-[2rem]">
+                            <div>
+                              <label className="block text-[10px] font-bold text-secondary uppercase tracking-widest mb-1.5 ml-1">Nome da Diretoria</label>
+                              <input 
+                                type="text" 
+                                value={dirName}
+                                onChange={(e) => setDirName(e.target.value)}
+                                placeholder="Ex: Diretoria Fundiária"
+                                className="w-full bg-white border-none rounded-xl px-4 py-2.5 text-xs focus:ring-2 focus:ring-primary transition-all"
+                                required
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-[10px] font-bold text-secondary uppercase tracking-widest mb-1.5 ml-1">Nome do Diretor</label>
+                              <input 
+                                type="text" 
+                                value={dirDirector}
+                                onChange={(e) => setDirDirector(e.target.value)}
+                                placeholder="Nome completo"
+                                className="w-full bg-white border-none rounded-xl px-4 py-2.5 text-xs focus:ring-2 focus:ring-primary transition-all"
+                                required
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-[10px] font-bold text-secondary uppercase tracking-widest mb-1.5 ml-1">Foto</label>
+                              <div className="flex gap-2">
+                                <input 
+                                  type="file" 
+                                  accept="image/*"
+                                  onChange={(e) => setDirPhoto(e.target.files?.[0] || null)}
+                                  className="flex-1 bg-white border-none rounded-xl px-4 py-2 text-[10px] focus:ring-2 focus:ring-primary transition-all"
+                                />
+                                <button 
+                                  type="submit"
+                                  disabled={isAddingDiretoria}
+                                  className="bg-primary text-white p-2.5 rounded-xl shadow-lg shadow-primary/20 active:scale-95 transition-all"
+                                >
+                                  {isAddingDiretoria ? <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <Plus className="w-5 h-5" />}
+                                </button>
+                              </div>
+                            </div>
+                          </form>
+
+                          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                            {diretorias.map((dir) => (
+                              <div key={dir.id} className="flex items-center gap-4 p-4 bg-surface-container-low rounded-2xl border border-primary/5 group">
+                                <img src={dir.photo_url} alt={dir.director_name} className="w-12 h-12 rounded-xl object-cover shadow-sm" referrerPolicy="no-referrer" />
+                                <div className="flex-1 min-w-0">
+                                  <p className="text-xs font-black text-primary uppercase truncate">{dir.director_name}</p>
+                                  <p className="text-[10px] font-bold text-secondary uppercase truncate">{dir.name}</p>
+                                </div>
+                                <button 
+                                  onClick={() => handleDeleteDiretoria(dir.id)}
+                                  className="p-2 text-red-500 hover:bg-red-50 rounded-xl opacity-0 group-hover:opacity-100 transition-all"
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+
+                        {/* Galeria Management */}
+                        <div className="bg-white p-8 rounded-3xl shadow-xl border border-primary/5">
+                          <div className="flex items-center gap-4 mb-8">
+                            <div className="w-12 h-12 bg-primary/10 rounded-2xl flex items-center justify-center text-primary">
+                              <Image className="w-6 h-6" />
+                            </div>
+                            <div>
+                              <h3 className="text-2xl font-black text-on-surface font-headline leading-none">Galeria de Presidentes</h3>
+                              <p className="text-xs text-secondary mt-1">Adicione ex-presidentes à galeria histórica</p>
+                            </div>
+                          </div>
+
+                          <form onSubmit={handleAddGaleria} className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8 bg-surface-container-low p-6 rounded-[2rem]">
+                            <div>
+                              <label className="block text-[10px] font-bold text-secondary uppercase tracking-widest mb-1.5 ml-1">Nome do Presidente</label>
+                              <input 
+                                type="text" 
+                                value={galName}
+                                onChange={(e) => setGalName(e.target.value)}
+                                placeholder="Nome completo"
+                                className="w-full bg-white border-none rounded-xl px-4 py-2.5 text-xs focus:ring-2 focus:ring-primary transition-all"
+                                required
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-[10px] font-bold text-secondary uppercase tracking-widest mb-1.5 ml-1">Período</label>
+                              <input 
+                                type="text" 
+                                value={galPeriod}
+                                onChange={(e) => setGalPeriod(e.target.value)}
+                                placeholder="Ex: 2019 - 2022"
+                                className="w-full bg-white border-none rounded-xl px-4 py-2.5 text-xs focus:ring-2 focus:ring-primary transition-all"
+                                required
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-[10px] font-bold text-secondary uppercase tracking-widest mb-1.5 ml-1">Foto</label>
+                              <div className="flex gap-2">
+                                <input 
+                                  type="file" 
+                                  accept="image/*"
+                                  onChange={(e) => setGalPhoto(e.target.files?.[0] || null)}
+                                  className="flex-1 bg-white border-none rounded-xl px-4 py-2 text-[10px] focus:ring-2 focus:ring-primary transition-all"
+                                />
+                                <button 
+                                  type="submit"
+                                  disabled={isAddingGaleria}
+                                  className="bg-primary text-white p-2.5 rounded-xl shadow-lg shadow-primary/20 active:scale-95 transition-all"
+                                >
+                                  {isAddingGaleria ? <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <Plus className="w-5 h-5" />}
+                                </button>
+                              </div>
+                            </div>
+                          </form>
+
+                          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                            {galeria.map((p) => (
+                              <div key={p.id} className="flex items-center gap-4 p-4 bg-surface-container-low rounded-2xl border border-primary/5 group">
+                                <img src={p.photo_url} alt={p.name} className="w-12 h-12 rounded-xl object-cover shadow-sm" referrerPolicy="no-referrer" />
+                                <div className="flex-1 min-w-0">
+                                  <p className="text-xs font-black text-primary uppercase truncate">{p.name}</p>
+                                  <p className="text-[10px] font-bold text-secondary uppercase truncate">{p.period}</p>
+                                </div>
+                                <button 
+                                  onClick={() => handleDeleteGaleria(p.id)}
+                                  className="p-2 text-red-500 hover:bg-red-50 rounded-xl opacity-0 group-hover:opacity-100 transition-all"
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             )}
+          </motion.div>
+        )}
+        {currentPage === 'presidencia' && (
+          <motion.div 
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="max-w-4xl mx-auto px-6 py-12"
+          >
+            {presidencia ? (
+              <div className="bg-white rounded-[2.5rem] shadow-xl border border-primary/5 overflow-hidden">
+                <div className="md:flex">
+                  <div className="md:w-1/3 p-8">
+                    <div className="aspect-square rounded-3xl overflow-hidden shadow-lg border-4 border-primary/10">
+                      <img 
+                        src={presidencia.photo_url} 
+                        alt={presidencia.name} 
+                        className="w-full h-full object-cover"
+                        referrerPolicy="no-referrer"
+                      />
+                    </div>
+                  </div>
+                  <div className="md:w-2/3 p-8 md:pl-0">
+                    <h1 className="text-3xl font-black text-primary font-headline mb-2 uppercase">{presidencia.name}</h1>
+                    <div className="h-1 w-20 bg-primary rounded-full mb-6" />
+                    <div className="prose prose-sm max-w-none text-secondary leading-relaxed whitespace-pre-wrap">
+                      {presidencia.biography}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="flex items-center justify-center py-20">
+                <div className="w-12 h-12 border-4 border-primary/20 border-t-primary rounded-full animate-spin" />
+              </div>
+            )}
+          </motion.div>
+        )}
+
+        {currentPage === 'diretorias' && (
+          <motion.div 
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="max-w-6xl mx-auto px-6 py-12"
+          >
+            <div className="text-center mb-12">
+              <h1 className="text-4xl font-black text-primary font-headline mb-4 uppercase">Diretorias</h1>
+              <div className="h-1 w-20 bg-primary rounded-full mx-auto" />
+            </div>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+              {diretorias.map((dir) => (
+                <div key={dir.id} className="bg-white rounded-[2rem] shadow-lg border border-primary/5 overflow-hidden group hover:shadow-2xl transition-all duration-500">
+                  <div className="aspect-square overflow-hidden relative">
+                    <img 
+                      src={dir.photo_url} 
+                      alt={dir.director_name} 
+                      className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700"
+                      referrerPolicy="no-referrer"
+                    />
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+                  </div>
+                  <div className="p-6 text-center">
+                    <h3 className="text-xl font-black text-primary font-headline mb-1 uppercase">{dir.director_name}</h3>
+                    <p className="text-xs font-bold text-secondary uppercase tracking-widest">{dir.name}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </motion.div>
+        )}
+
+        {currentPage === 'galeria' && (
+          <motion.div 
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="max-w-6xl mx-auto px-6 py-12"
+          >
+            <div className="text-center mb-12">
+              <h1 className="text-4xl font-black text-primary font-headline mb-4 uppercase">Galeria de Presidentes</h1>
+              <div className="h-1 w-20 bg-primary rounded-full mx-auto" />
+            </div>
+            
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+              {galeria.map((p) => (
+                <div key={p.id} className="bg-white rounded-3xl shadow-md border border-primary/5 overflow-hidden group hover:shadow-xl transition-all">
+                  <div className="aspect-[3/4] overflow-hidden">
+                    <img 
+                      src={p.photo_url} 
+                      alt={p.name} 
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                      referrerPolicy="no-referrer"
+                    />
+                  </div>
+                  <div className="p-4 text-center bg-surface-container-low">
+                    <h3 className="text-sm font-black text-primary font-headline mb-1 uppercase">{p.name}</h3>
+                    <p className="text-[10px] font-bold text-secondary uppercase tracking-tighter">{p.period}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
           </motion.div>
         )}
       </main>

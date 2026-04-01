@@ -54,6 +54,42 @@ const initDb = async () => {
         upload_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         author_id INTEGER REFERENCES users(id)
       );
+
+      CREATE TABLE IF NOT EXISTS settings (
+        key TEXT PRIMARY KEY,
+        value TEXT
+      );
+
+      CREATE TABLE IF NOT EXISTS presidencia (
+        id SERIAL PRIMARY KEY,
+        name TEXT,
+        photo_url TEXT,
+        biography TEXT,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+
+      CREATE TABLE IF NOT EXISTS diretorias (
+        id SERIAL PRIMARY KEY,
+        name TEXT,
+        director_name TEXT,
+        photo_url TEXT,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+
+      CREATE TABLE IF NOT EXISTS galeria_presidentes (
+        id SERIAL PRIMARY KEY,
+        name TEXT,
+        photo_url TEXT,
+        period TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+
+      INSERT INTO settings (key, value) VALUES ('cover_photo', '/uploads/default-cover.jpg') ON CONFLICT DO NOTHING;
+      
+      -- Initialize presidencia if empty
+      INSERT INTO presidencia (id, name, photo_url, biography) 
+      SELECT 1, 'Presidente do ITERAIMA', 'https://picsum.photos/seed/president/400/400', 'Biografia do presidente...'
+      WHERE NOT EXISTS (SELECT 1 FROM presidencia WHERE id = 1);
     `);
 
     // Create default admin if not exists
@@ -179,6 +215,136 @@ async function startServer() {
       res.json({ message: "Usuário rejeitado" });
     } catch (err) {
       res.status(500).json({ message: "Erro ao rejeitar usuário" });
+    }
+  });
+
+  app.post("/api/users/change-password", authenticateToken, async (req: any, res) => {
+    const { currentPassword, newPassword } = req.body;
+    try {
+      const { rows } = await pool.query("SELECT * FROM users WHERE id = $1", [req.user.id]);
+      const user = rows[0];
+
+      if (user && bcrypt.compareSync(currentPassword, user.password)) {
+        const hashedPassword = bcrypt.hashSync(newPassword, 10);
+        await pool.query("UPDATE users SET password = $1 WHERE id = $2", [hashedPassword, req.user.id]);
+        res.json({ message: "Senha alterada com sucesso" });
+      } else {
+        res.status(400).json({ message: "Senha atual incorreta" });
+      }
+    } catch (err) {
+      res.status(500).json({ message: "Erro ao alterar senha" });
+    }
+  });
+
+  app.get("/api/settings/cover", async (req, res) => {
+    try {
+      const { rows } = await pool.query("SELECT value FROM settings WHERE key = 'cover_photo'");
+      res.json({ url: rows[0]?.value || "" });
+    } catch (err) {
+      res.status(500).json({ message: "Erro ao buscar foto de capa" });
+    }
+  });
+
+  app.post("/api/settings/cover", authenticateToken, async (req: any, res) => {
+    if (req.user.role !== 'admin' && req.user.role !== 'editor') return res.sendStatus(403);
+    const { url } = req.body;
+    try {
+      await pool.query("INSERT INTO settings (key, value) VALUES ('cover_photo', $1) ON CONFLICT (key) DO UPDATE SET value = $1", [url]);
+      res.json({ message: "Foto de capa atualizada" });
+    } catch (err) {
+      res.status(500).json({ message: "Erro ao atualizar foto de capa" });
+    }
+  });
+
+  // Presidencia
+  app.get("/api/presidencia", async (req, res) => {
+    try {
+      const { rows } = await pool.query("SELECT * FROM presidencia WHERE id = 1");
+      res.json(rows[0]);
+    } catch (err) {
+      res.status(500).json({ message: "Erro ao buscar informações da presidência" });
+    }
+  });
+
+  app.post("/api/presidencia", authenticateToken, async (req: any, res) => {
+    if (req.user.role !== 'admin' && req.user.role !== 'editor') return res.sendStatus(403);
+    const { name, photo_url, biography } = req.body;
+    try {
+      await pool.query(
+        "UPDATE presidencia SET name = $1, photo_url = $2, biography = $3, updated_at = CURRENT_TIMESTAMP WHERE id = 1",
+        [name, photo_url, biography]
+      );
+      res.json({ message: "Informações da presidência atualizadas" });
+    } catch (err) {
+      res.status(500).json({ message: "Erro ao atualizar informações da presidência" });
+    }
+  });
+
+  // Diretorias
+  app.get("/api/diretorias", async (req, res) => {
+    try {
+      const { rows } = await pool.query("SELECT * FROM diretorias ORDER BY id ASC");
+      res.json(rows);
+    } catch (err) {
+      res.status(500).json({ message: "Erro ao buscar diretorias" });
+    }
+  });
+
+  app.post("/api/diretorias", authenticateToken, async (req: any, res) => {
+    if (req.user.role !== 'admin' && req.user.role !== 'editor') return res.sendStatus(403);
+    const { name, director_name, photo_url } = req.body;
+    try {
+      await pool.query(
+        "INSERT INTO diretorias (name, director_name, photo_url) VALUES ($1, $2, $3)",
+        [name, director_name, photo_url]
+      );
+      res.json({ message: "Diretoria adicionada com sucesso" });
+    } catch (err) {
+      res.status(500).json({ message: "Erro ao adicionar diretoria" });
+    }
+  });
+
+  app.delete("/api/diretorias/:id", authenticateToken, async (req: any, res) => {
+    if (req.user.role !== 'admin' && req.user.role !== 'editor') return res.sendStatus(403);
+    try {
+      await pool.query("DELETE FROM diretorias WHERE id = $1", [req.params.id]);
+      res.json({ message: "Diretoria removida com sucesso" });
+    } catch (err) {
+      res.status(500).json({ message: "Erro ao remover diretoria" });
+    }
+  });
+
+  // Galeria de Presidentes
+  app.get("/api/galeria", async (req, res) => {
+    try {
+      const { rows } = await pool.query("SELECT * FROM galeria_presidentes ORDER BY created_at DESC");
+      res.json(rows);
+    } catch (err) {
+      res.status(500).json({ message: "Erro ao buscar galeria" });
+    }
+  });
+
+  app.post("/api/galeria", authenticateToken, async (req: any, res) => {
+    if (req.user.role !== 'admin' && req.user.role !== 'editor') return res.sendStatus(403);
+    const { name, photo_url, period } = req.body;
+    try {
+      await pool.query(
+        "INSERT INTO galeria_presidentes (name, photo_url, period) VALUES ($1, $2, $3)",
+        [name, photo_url, period]
+      );
+      res.json({ message: "Presidente adicionado à galeria" });
+    } catch (err) {
+      res.status(500).json({ message: "Erro ao adicionar à galeria" });
+    }
+  });
+
+  app.delete("/api/galeria/:id", authenticateToken, async (req: any, res) => {
+    if (req.user.role !== 'admin' && req.user.role !== 'editor') return res.sendStatus(403);
+    try {
+      await pool.query("DELETE FROM galeria_presidentes WHERE id = $1", [req.params.id]);
+      res.json({ message: "Presidente removido da galeria" });
+    } catch (err) {
+      res.status(500).json({ message: "Erro ao remover da galeria" });
     }
   });
 
