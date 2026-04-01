@@ -91,6 +91,14 @@ const initDb = async () => {
       INSERT INTO presidencia (id, name, photo_url, biography) 
       SELECT 1, 'Presidente do ITERAIMA', 'https://picsum.photos/seed/president/400/400', 'Biografia do presidente...'
       WHERE NOT EXISTS (SELECT 1 FROM presidencia WHERE id = 1);
+
+      -- Ensure month column exists in documents table
+      DO $$ 
+      BEGIN 
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='documents' AND column_name='month') THEN 
+          ALTER TABLE documents ADD COLUMN month TEXT; 
+        END IF; 
+      END $$;
     `);
 
     // Create default admin if not exists
