@@ -7,10 +7,11 @@ let aiInstance: GoogleGenAI | null = null;
 function getAi() {
   if (!aiInstance) {
     const apiKey = process.env.GEMINI_API_KEY;
-    if (!apiKey) {
-      console.warn("GEMINI_API_KEY is missing. AI features will not work.");
+    if (!apiKey || apiKey === "undefined") {
+      console.error("GEMINI_API_KEY is missing or undefined. Please check your environment variables.");
+      return null;
     }
-    aiInstance = new GoogleGenAI({ apiKey: apiKey || "" });
+    aiInstance = new GoogleGenAI({ apiKey });
   }
   return aiInstance;
 }
@@ -27,9 +28,14 @@ export async function getAiResponse(
 ) {
   try {
     const ai = getAi();
+    if (!ai) {
+      return "O assistente de IA não está configurado corretamente (chave de API ausente).";
+    }
+
     // Collect all news text
     const newsText = context.news
       .map(n => `Notícia (${n.category}): ${n.title}\n${n.content}`)
+      .slice(0, 5) // Limit to 5 most recent
       .join('\n\n');
 
     // Collect institutional text
@@ -48,23 +54,21 @@ export async function getAiResponse(
     // For documents, we use urlContext if they are available
     const docUrls = context.documents
       .filter(d => d.url.endsWith('.pdf'))
-      .slice(0, 20) // Limit to 20 as per tool constraints
+      .slice(0, 10) // Limit to 10 for better performance
       .map(d => {
-        // Ensure absolute URL
         if (d.url.startsWith('http')) return d.url;
         return `${window.location.origin}${d.url}`;
       });
 
     const docsSummary = context.documents
       .map(d => `- ${d.name} (${d.category}, ${d.year}${d.month ? `, ${d.month}` : ''})`)
+      .slice(0, 20)
       .join('\n');
 
     // System instruction
     const systemInstruction = `
       Você é o Assistente Virtual do ITERAIMA (Instituto de Terras e Colonização de Roraima).
       Sua missão é ajudar os cidadãos com informações sobre o instituto, notícias, transparência e documentos.
-      
-      Abaixo estão as informações básicas da aplicação:
       
       --- INFORMAÇÕES INSTITUCIONAIS ---
       ${presidenciaText}
@@ -79,18 +83,17 @@ export async function getAiResponse(
       
       --- INSTRUÇÕES ---
       1. Responda de forma clara, educada e profissional.
-      2. Você tem acesso ao conteúdo dos documentos PDF através da ferramenta urlContext. Use-os para responder perguntas específicas sobre editais, leis, decretos ou relatórios.
+      2. Você tem acesso ao conteúdo dos documentos PDF através da ferramenta urlContext. Use-os para responder perguntas específicas.
       3. Se a pergunta for sobre um documento que não está na lista, informe que ele pode não estar disponível digitalmente ainda.
       4. Se você não souber a resposta, direcione o usuário para: protoiteraima@gmail.com ou (95) 98408-0403.
-      5. Use Markdown para formatar suas respostas (negrito, listas, etc).
+      5. Use Markdown para formatar suas respostas.
     `;
 
     // Let's refine the contents to include the URLs for the model to fetch.
     const promptWithUrls = `
       Pergunta do Usuário: ${query}
       
-      Por favor, consulte os seguintes documentos se necessário para responder:
-      ${docUrls.join('\n')}
+      ${docUrls.length > 0 ? `Por favor, consulte os seguintes documentos se necessário para responder:\n${docUrls.join('\n')}` : ''}
     `;
 
     const response = await ai.models.generateContent({
@@ -102,9 +105,16 @@ export async function getAiResponse(
       },
     });
 
+    if (!response || !response.text) {
+      throw new Error("Resposta vazia da IA");
+    }
+
     return response.text;
   } catch (error) {
-    console.error('Error getting AI response:', error);
+    console.error('Error in AI service:', error);
+    if (error instanceof Error) {
+      return `Desculpe, ocorreu um erro ao processar sua pergunta: ${error.message}`;
+    }
     return 'Desculpe, ocorreu um erro ao processar sua pergunta. Por favor, tente novamente mais tarde.';
   }
 }
@@ -116,6 +126,10 @@ export async function getAiResponseWithPdf(
   context: any
 ) {
   try {
+    const ai = getAi();
+    if (!ai) {
+      return "O assistente de IA não está configurado corretamente (chave de API ausente).";
+    }
     const pdfText = await extractTextFromPdf(pdfUrl);
     
     const systemInstruction = `
@@ -138,7 +152,7 @@ export async function getAiResponseWithPdf(
 
     return response.text;
   } catch (error) {
-    console.error('Error getting AI response with PDF:', error);
+    console.error('Error in AI service with PDF:', error);
     return 'Erro ao ler o documento PDF.';
   }
 }
