@@ -1,20 +1,28 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
-</div>
+# ITERAIMA - Portal Institucional e da Transparência
 
-# Run and deploy your AI Studio app
+Este é o portal oficial do **Instituto de Terras e Colonização de Roraima (ITERAIMA)**, desenvolvido para fornecer informações sobre regularização fundiária, notícias institucionais, transparência pública e atendimento via Inteligência Artificial.
 
-This contains everything you need to run your app locally.
+## 🚀 Como Iniciar
 
-View your app in AI Studio: https://ai.studio/apps/4779889c-14a3-4f95-bfcb-ff148b0b6339
+Para rodar o projeto localmente ou em produção, consulte a documentação detalhada:
 
-## Run Locally
+👉 **[DOCUMENTATION.md](./DOCUMENTATION.md)**
 
-**Prerequisites:**  Node.js
+## 🛠️ Tecnologias Utilizadas
 
+- **Frontend:** React, Vite, Tailwind CSS, Lucide Icons, Framer Motion.
+- **Backend:** Node.js, Express, Multer (Uploads), JWT (Auth).
+- **Banco de Dados:** PostgreSQL.
+- **IA:** Google Gemini API.
 
-1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
-   `npm run dev`
+## 📁 Estrutura Principal
+
+- `/src/App.tsx`: Interface principal do portal.
+- `/server.ts`: Servidor de API e Banco de Dados.
+- `/src/services/aiService.ts`: Integração com a IA.
+- `/uploads/`: Armazenamento de documentos e imagens.
+
+## 📞 Contato
+
+- **Email:** protoiteraima@gmail.com
+- **WhatsApp:** (95) 98408-0403

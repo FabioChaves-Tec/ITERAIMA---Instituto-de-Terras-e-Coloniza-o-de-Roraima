@@ -1,6 +1,6 @@
 import { GoogleGenAI } from "@google/genai";
-import { TransparencyDocument, News, Presidencia, Diretoria, GaleriaPresidente } from "../api";
-import { extractTextFromPdf } from "../lib/pdfUtils";
+import { News, TransparencyDocument, Presidencia, Diretoria, GaleriaPresidente } from '../api';
+import { extractTextFromPdf } from '../lib/pdfUtils';
 
 let aiInstance: GoogleGenAI | null = null;
 
@@ -119,7 +119,6 @@ export async function getAiResponse(
   }
 }
 
-// Advanced version that can extract text from a specific PDF if needed
 export async function getAiResponseWithPdf(
   query: string,
   pdfUrl: string,

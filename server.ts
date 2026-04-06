@@ -18,10 +18,10 @@ if (!fs.existsSync(uploadDir)) {
 }
 
 const pool = new Pool({
-  connectionString: process.env.DATABASE_URL || "postgres://postgres:postgres@localhost:5432/iteraima"
+  connectionString: process.env.DATABASE_URL || "postgres://iteraima_user:NovaSenha123@localhost:5432/iteraima"
 });
 
-const JWT_SECRET = process.env.JWT_SECRET || "iteraima-secret-key";
+const JWT_SECRET = process.env.JWT_SECRET || "iteraima-secret-key-producao";
 
 // Initialize Database
 const initDb = async () => {
