@@ -72,7 +72,8 @@ O banco de dados PostgreSQL é inicializado automaticamente pelo `server.ts`. As
 
 1.  **users**: Armazena editores (id, email, password, role).
 2.  **news**: Notícias (title, content, category, image_url).
-3.  **documents**: Documentos de transparência (name, category, year, month, url).
+3.  **documents**: Documentos de transparência e legislação (name, category, year, month, url).
+    *   *Categorias:* Balanço Financeiro, Editais, Lei Vigente, Lei Não Vigente, etc.
 4.  **presidencia**: Informações do atual presidente.
 5.  **diretorias**: Lista de diretores e suas pastas.
 6.  **galeria_presidentes**: Histórico de ex-presidentes.

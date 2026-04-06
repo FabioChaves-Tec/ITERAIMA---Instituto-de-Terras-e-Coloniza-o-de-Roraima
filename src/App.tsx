@@ -86,7 +86,12 @@ const transparencyCategories = [
   'DIÁRIAS',
   'ESTAGIÁRIOS',
   'FOLHA DE PAGAMENTO',
-  'TERCEIRIZADOS'
+  'TERCEIRIZADOS',
+  'ADMINISTRATIVA',
+  'FUNDIÁRIA',
+  'MODELOS DE REQUERIMENTOS',
+  'LEI VIGENTE',
+  'LEI NÃO VIGENTE'
 ];
 
 const MONTHS = [
@@ -891,9 +896,56 @@ export default function App() {
   ];
 
   const legislacaoItems = [
-    { label: 'ADMINISTRATIVA', icon: Scale },
-    { label: 'FUNDIÁRIA', icon: FileText },
-    { label: 'MODELOS DE REQUERIMENTOS', icon: FileSignature }
+    { 
+      label: 'ADMINISTRATIVA', 
+      icon: Scale,
+      subItems: [
+        { label: '2026', icon: Calendar },
+        { label: '2025', icon: Calendar },
+        { label: '2024', icon: Calendar },
+        { label: '2023', icon: Calendar },
+        { label: '2022', icon: Calendar }
+      ]
+    },
+    { 
+      label: 'FUNDIÁRIA', 
+      icon: FileText,
+      subItems: [
+        { 
+          label: 'LEI VIGENTE', 
+          icon: ShieldCheck,
+          subItems: [
+            { label: '2026', icon: Calendar },
+            { label: '2025', icon: Calendar },
+            { label: '2024', icon: Calendar },
+            { label: '2023', icon: Calendar },
+            { label: '2022', icon: Calendar }
+          ]
+        },
+        { 
+          label: 'LEI NÃO VIGENTE', 
+          icon: ShieldAlert,
+          subItems: [
+            { label: '2026', icon: Calendar },
+            { label: '2025', icon: Calendar },
+            { label: '2024', icon: Calendar },
+            { label: '2023', icon: Calendar },
+            { label: '2022', icon: Calendar }
+          ]
+        }
+      ]
+    },
+    { 
+      label: 'MODELOS DE REQUERIMENTOS', 
+      icon: FileSignature,
+      subItems: [
+        { label: '2026', icon: Calendar },
+        { label: '2025', icon: Calendar },
+        { label: '2024', icon: Calendar },
+        { label: '2023', icon: Calendar },
+        { label: '2022', icon: Calendar }
+      ]
+    }
   ];
 
   return (
@@ -1137,13 +1189,65 @@ export default function App() {
                         className="overflow-hidden grid gap-2 pl-4 border-l-2 border-primary/10 ml-4 mt-2"
                       >
                         {legislacaoItems.map((item) => (
-                          <button 
-                            key={item.label}
-                            className="flex items-center gap-3 p-3 rounded-xl hover:bg-primary/5 text-primary text-xs font-bold transition-colors text-left"
-                          >
-                            <item.icon className="w-4 h-4 opacity-60" />
-                            {item.label}
-                          </button>
+                          <div key={item.label}>
+                            <button 
+                              onClick={() => {
+                                if (item.subItems) {
+                                  if (item.subItems.some(i => i.label === '2022')) {
+                                    setSelectedFolder({ label: item.label, items: item.subItems });
+                                    setCurrentPage('folder');
+                                    setIsSidebarOpen(false);
+                                  } else {
+                                    const isOpening = openLevel2Menu !== item.label;
+                                    setOpenLevel2Menu(isOpening ? item.label : null);
+                                    if (!isOpening) {
+                                      setOpenLevel3Menu(null);
+                                      setOpenLevel4Menu(null);
+                                    }
+                                  }
+                                }
+                              }}
+                              className="flex items-center justify-between w-full p-3 rounded-xl hover:bg-primary/5 text-primary text-xs font-bold transition-colors text-left"
+                            >
+                              <div className="flex items-center gap-3">
+                                <item.icon className="w-4 h-4 opacity-60" />
+                                {item.label}
+                              </div>
+                              {item.subItems && !item.subItems.some(i => i.label === '2022') && (
+                                <ChevronRight className={`w-4 h-4 transition-transform ${openLevel2Menu === item.label ? 'rotate-90' : ''}`} />
+                              )}
+                            </button>
+
+                            {item.subItems && !item.subItems.some(i => i.label === '2022') && (
+                              <AnimatePresence>
+                                {openLevel2Menu === item.label && (
+                                  <motion.div 
+                                    initial={{ height: 0, opacity: 0 }}
+                                    animate={{ height: 'auto', opacity: 1 }}
+                                    exit={{ height: 0, opacity: 0 }}
+                                    className="overflow-hidden grid gap-1 pl-6 border-l border-primary/10 ml-4 mt-1"
+                                  >
+                                    {item.subItems.map((sub) => (
+                                      <button 
+                                        key={sub.label}
+                                        onClick={() => {
+                                          if (sub.subItems) {
+                                            setSelectedFolder({ label: sub.label, items: sub.subItems });
+                                            setCurrentPage('folder');
+                                            setIsSidebarOpen(false);
+                                          }
+                                        }}
+                                        className="flex items-center gap-3 w-full p-2 rounded-lg hover:bg-primary/5 text-primary/70 text-[10px] font-bold transition-colors text-left"
+                                      >
+                                        <sub.icon className="w-3 h-3 opacity-60" />
+                                        {sub.label}
+                                      </button>
+                                    ))}
+                                  </motion.div>
+                                )}
+                              </AnimatePresence>
+                            )}
+                          </div>
                         ))}
                       </motion.div>
                     )}
@@ -1512,15 +1616,69 @@ export default function App() {
                         className="absolute top-full left-0 w-full mt-2 bg-white rounded-3xl shadow-2xl p-4 z-30 grid gap-2"
                       >
                         {legislacaoItems.map((sub) => (
-                          <button 
-                            key={sub.label}
-                            className="flex items-center gap-3 p-3 rounded-2xl hover:bg-primary/5 text-primary text-xs font-bold transition-colors text-left"
-                          >
-                            <div className="w-8 h-8 bg-primary/10 rounded-full flex items-center justify-center">
-                              <sub.icon className="w-4 h-4" />
-                            </div>
-                            {sub.label}
-                          </button>
+                          <div key={sub.label}>
+                            <button 
+                              onClick={() => {
+                                if (sub.subItems) {
+                                  if (sub.subItems.some(i => i.label === '2022')) {
+                                    setSelectedFolder({ label: sub.label, items: sub.subItems });
+                                    setCurrentPage('folder');
+                                    setShowLegislacaoSub(false);
+                                    scrollToTop();
+                                  } else {
+                                    const isOpening = openLevel2Menu !== sub.label;
+                                    setOpenLevel2Menu(isOpening ? sub.label : null);
+                                    if (!isOpening) {
+                                      setOpenLevel3Menu(null);
+                                      setOpenLevel4Menu(null);
+                                    }
+                                  }
+                                }
+                              }}
+                              className="flex items-center justify-between w-full p-3 rounded-2xl hover:bg-primary/5 text-primary text-xs font-bold transition-colors text-left"
+                            >
+                              <div className="flex items-center gap-3">
+                                <div className="w-8 h-8 bg-primary/10 rounded-full flex items-center justify-center">
+                                  <sub.icon className="w-4 h-4" />
+                                </div>
+                                {sub.label}
+                              </div>
+                              {sub.subItems && !sub.subItems.some(i => i.label === '2022') && (
+                                <ChevronRight className={`w-4 h-4 transition-transform ${openLevel2Menu === sub.label ? 'rotate-90' : ''}`} />
+                              )}
+                            </button>
+
+                            {sub.subItems && !sub.subItems.some(i => i.label === '2022') && (
+                              <AnimatePresence>
+                                {openLevel2Menu === sub.label && (
+                                  <motion.div 
+                                    initial={{ height: 0, opacity: 0 }}
+                                    animate={{ height: 'auto', opacity: 1 }}
+                                    exit={{ height: 0, opacity: 0 }}
+                                    className="overflow-hidden grid gap-1 pl-12 border-l border-primary/10 ml-4 mt-1"
+                                  >
+                                    {sub.subItems.map((item) => (
+                                      <button 
+                                        key={item.label}
+                                        onClick={() => {
+                                          if (item.subItems) {
+                                            setSelectedFolder({ label: item.label, items: item.subItems });
+                                            setCurrentPage('folder');
+                                            setShowLegislacaoSub(false);
+                                            scrollToTop();
+                                          }
+                                        }}
+                                        className="flex items-center gap-3 w-full p-2 rounded-lg hover:bg-primary/5 text-primary/70 text-[10px] font-bold transition-colors text-left"
+                                      >
+                                        <item.icon className="w-3 h-3 opacity-60" />
+                                        {item.label}
+                                      </button>
+                                    ))}
+                                  </motion.div>
+                                )}
+                              </AnimatePresence>
+                            )}
+                          </div>
                         ))}
                       </motion.div>
                     )}
@@ -1732,7 +1890,9 @@ export default function App() {
                 <ArrowLeft className="w-6 h-6" />
               </button>
               <div>
-                <span className="text-primary font-bold text-xs uppercase tracking-[0.2em]">Transparência</span>
+                <span className="text-primary font-bold text-xs uppercase tracking-[0.2em]">
+                  {legislacaoItems.some(i => i.label === selectedFolder.label || (i.subItems && i.subItems.some(s => s.label === selectedFolder.label))) ? 'Legislação' : 'Transparência'}
+                </span>
                 <h2 className="text-3xl font-black text-on-surface font-headline leading-none mt-1">{selectedFolder.label}</h2>
               </div>
             </div>
