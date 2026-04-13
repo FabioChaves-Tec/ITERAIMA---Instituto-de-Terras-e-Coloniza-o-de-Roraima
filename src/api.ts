@@ -219,6 +219,38 @@ export const api = {
     return res.json();
   },
 
+  async getLogo(): Promise<{ url: string }> {
+    const res = await fetch(`${API_URL}/api/settings/logo`);
+    if (!res.ok) throw new Error('Erro ao buscar logo');
+    return res.json();
+  },
+
+  async updateLogo(url: string) {
+    const res = await fetch(`${API_URL}/api/settings/logo`, {
+      method: 'POST',
+      headers: getHeaders(),
+      body: JSON.stringify({ url })
+    });
+    if (!res.ok) throw new Error('Erro ao atualizar logo');
+    return res.json();
+  },
+
+  async getFavicon(): Promise<{ url: string }> {
+    const res = await fetch(`${API_URL}/api/settings/favicon`);
+    if (!res.ok) throw new Error('Erro ao buscar favicon');
+    return res.json();
+  },
+
+  async updateFavicon(url: string) {
+    const res = await fetch(`${API_URL}/api/settings/favicon`, {
+      method: 'POST',
+      headers: getHeaders(),
+      body: JSON.stringify({ url })
+    });
+    if (!res.ok) throw new Error('Erro ao atualizar favicon');
+    return res.json();
+  },
+
   async getPresidencia(): Promise<Presidencia> {
     const res = await fetch(`${API_URL}/api/presidencia`);
     if (!res.ok) throw new Error('Erro ao buscar informações da presidência');

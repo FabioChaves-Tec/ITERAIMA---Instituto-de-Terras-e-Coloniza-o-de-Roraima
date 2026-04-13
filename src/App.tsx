@@ -162,7 +162,11 @@ export default function App() {
   const [pendingUsers, setPendingUsers] = useState<User[]>([]);
   const [allUsers, setAllUsers] = useState<User[]>([]);
   const [coverPhotoUrl, setCoverPhotoUrl] = useState(IMAGES.hero);
+  const [logoUrl, setLogoUrl] = useState(IMAGES.logo);
+  const [faviconUrl, setFaviconUrl] = useState(IMAGES.logo);
   const [isUpdatingCover, setIsUpdatingCover] = useState(false);
+  const [isUpdatingLogo, setIsUpdatingLogo] = useState(false);
+  const [isUpdatingFavicon, setIsUpdatingFavicon] = useState(false);
 
   // Password Change State
   const [currentPassword, setCurrentPassword] = useState('');
@@ -217,10 +221,12 @@ export default function App() {
     // Initial data fetch
     const fetchData = async () => {
       try {
-        const [news, docs, cover, pres, dir, gal] = await Promise.all([
+        const [news, docs, cover, logo, favicon, pres, dir, gal] = await Promise.all([
           api.getNews(),
           api.getDocuments(),
           api.getCoverPhoto(),
+          api.getLogo(),
+          api.getFavicon(),
           api.getPresidencia(),
           api.getDiretorias(),
           api.getGaleria()
@@ -228,6 +234,8 @@ export default function App() {
         setNewsList(news);
         setDocuments(docs);
         if (cover.url) setCoverPhotoUrl(cover.url);
+        if (logo.url) setLogoUrl(logo.url);
+        if (favicon.url) setFaviconUrl(favicon.url);
         setPresidencia(pres);
         setDiretorias(dir);
         setGaleria(gal);
@@ -282,6 +290,18 @@ export default function App() {
       setPresBio(presidencia.biography);
     }
   }, [presidencia]);
+
+  useEffect(() => {
+    const link = document.querySelector("link[rel~='icon']") as HTMLLinkElement;
+    if (link) {
+      link.href = faviconUrl;
+    } else {
+      const newLink = document.createElement('link');
+      newLink.rel = 'icon';
+      newLink.href = faviconUrl;
+      document.head.appendChild(newLink);
+    }
+  }, [faviconUrl]);
 
   const handleUpdatePresidencia = async (e: FormEvent) => {
     e.preventDefault();
@@ -584,6 +604,34 @@ export default function App() {
       toast.error('Erro ao atualizar foto de capa');
     } finally {
       setIsUpdatingCover(false);
+    }
+  };
+
+  const handleUpdateLogo = async (file: File) => {
+    setIsUpdatingLogo(true);
+    try {
+      const uploadRes = await api.uploadFile(file);
+      await api.updateLogo(uploadRes.url);
+      setLogoUrl(uploadRes.url);
+      toast.success('Logo atualizado!');
+    } catch (error) {
+      toast.error('Erro ao atualizar logo');
+    } finally {
+      setIsUpdatingLogo(false);
+    }
+  };
+
+  const handleUpdateFavicon = async (file: File) => {
+    setIsUpdatingFavicon(true);
+    try {
+      const uploadRes = await api.uploadFile(file);
+      await api.updateFavicon(uploadRes.url);
+      setFaviconUrl(uploadRes.url);
+      toast.success('Favicon atualizado!');
+    } catch (error) {
+      toast.error('Erro ao atualizar favicon');
+    } finally {
+      setIsUpdatingFavicon(false);
     }
   };
 
@@ -997,7 +1045,7 @@ export default function App() {
             >
               <div className="flex items-center justify-between mb-8">
                 <img 
-                  src={IMAGES.logo} 
+                  src={logoUrl} 
                   alt="ITERAIMA Logo" 
                   className="h-8 w-auto object-contain"
                   referrerPolicy="no-referrer"
@@ -1339,7 +1387,7 @@ export default function App() {
         >
           <Menu className="text-primary w-6 h-6" />
           <img 
-            src={IMAGES.logo} 
+            src={logoUrl} 
             alt="ITERAIMA Logo" 
             className="h-10 w-auto object-contain"
             referrerPolicy="no-referrer"
@@ -2665,58 +2713,140 @@ export default function App() {
 
                     {/* Change Cover Photo Section (Admin & Editor) */}
                     {(user?.role === 'admin' || user?.role === 'editor') && (
-                      <div className="bg-white p-8 rounded-3xl shadow-xl border border-primary/5">
-                        <div className="flex items-center gap-4 mb-8">
-                          <div className="w-12 h-12 bg-primary/10 rounded-2xl flex items-center justify-center text-primary">
-                            <Image className="w-6 h-6" />
+                      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                        <div className="bg-white p-8 rounded-3xl shadow-xl border border-primary/5">
+                          <div className="flex items-center gap-4 mb-8">
+                            <div className="w-12 h-12 bg-primary/10 rounded-2xl flex items-center justify-center text-primary">
+                              <Image className="w-6 h-6" />
+                            </div>
+                            <div>
+                              <h3 className="text-2xl font-black text-on-surface font-headline leading-none">Foto de Capa</h3>
+                              <p className="text-xs text-secondary mt-1">Altere a imagem principal da página inicial</p>
+                            </div>
                           </div>
-                          <div>
-                            <h3 className="text-2xl font-black text-on-surface font-headline leading-none">Foto de Capa</h3>
-                            <p className="text-xs text-secondary mt-1">Altere a imagem principal da página inicial</p>
+
+                          <div className="space-y-6">
+                            <div className="aspect-video w-full rounded-3xl overflow-hidden border border-primary/10 bg-surface-container-low">
+                              <img 
+                                src={coverPhotoUrl} 
+                                alt="Capa Atual" 
+                                className="w-full h-full object-cover"
+                                referrerPolicy="no-referrer"
+                              />
+                            </div>
+
+                            <div className="flex items-center gap-4">
+                              <input 
+                                type="file" 
+                                accept="image/*"
+                                id="cover-upload"
+                                className="hidden"
+                                onChange={(e) => {
+                                  if (e.target.files?.[0]) {
+                                    handleUpdateCover(e.target.files[0]);
+                                  }
+                                }}
+                              />
+                              <button 
+                                onClick={() => document.getElementById('cover-upload')?.click()}
+                                disabled={isUpdatingCover}
+                                className={`bg-primary text-white font-bold px-6 py-3 rounded-2xl shadow-lg shadow-primary/20 active:scale-95 transition-all flex items-center gap-2 text-xs uppercase tracking-widest ${isUpdatingCover ? 'opacity-50 cursor-not-allowed' : ''}`}
+                              >
+                                {isUpdatingCover ? (
+                                  <>
+                                    <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                                    ATUALIZANDO...
+                                  </>
+                                ) : (
+                                  <>
+                                    <Upload className="w-4 h-4" />
+                                    ALTERAR FOTO DE CAPA
+                                  </>
+                                )}
+                              </button>
+                            </div>
+                            <p className="text-[10px] text-secondary font-medium uppercase tracking-widest">Recomendado: 1920x1080px</p>
                           </div>
                         </div>
 
-                        <div className="space-y-6">
-                          <div className="aspect-video w-full max-w-2xl rounded-3xl overflow-hidden border border-primary/10 bg-surface-container-low">
-                            <img 
-                              src={coverPhotoUrl} 
-                              alt="Capa Atual" 
-                              className="w-full h-full object-cover"
-                              referrerPolicy="no-referrer"
-                            />
+                        <div className="space-y-8">
+                          {/* Logo Upload */}
+                          <div className="bg-white p-8 rounded-3xl shadow-xl border border-primary/5">
+                            <div className="flex items-center gap-4 mb-6">
+                              <div className="w-10 h-10 bg-primary/10 rounded-xl flex items-center justify-center text-primary">
+                                <Image className="w-5 h-5" />
+                              </div>
+                              <div>
+                                <h3 className="text-lg font-black text-on-surface font-headline leading-none">Logotipo</h3>
+                                <p className="text-[10px] text-secondary mt-1">Logo principal do cabeçalho e rodapé</p>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-6">
+                              <div className="w-20 h-20 bg-surface-container-low rounded-2xl flex items-center justify-center p-2 border border-primary/5">
+                                <img src={logoUrl} alt="Logo" className="max-w-full max-h-full object-contain" referrerPolicy="no-referrer" />
+                              </div>
+                              <div className="flex-1 space-y-3">
+                                <input 
+                                  type="file" 
+                                  accept="image/*"
+                                  id="logo-upload"
+                                  className="hidden"
+                                  onChange={(e) => {
+                                    if (e.target.files?.[0]) {
+                                      handleUpdateLogo(e.target.files[0]);
+                                    }
+                                  }}
+                                />
+                                <button 
+                                  onClick={() => document.getElementById('logo-upload')?.click()}
+                                  disabled={isUpdatingLogo}
+                                  className="w-full bg-primary/10 text-primary font-bold px-4 py-2.5 rounded-xl hover:bg-primary/20 transition-all text-[10px] uppercase tracking-widest flex items-center justify-center gap-2"
+                                >
+                                  {isUpdatingLogo ? 'ATUALIZANDO...' : 'ALTERAR LOGO'}
+                                </button>
+                                <p className="text-[9px] text-secondary font-medium uppercase tracking-widest">PNG transparente recomendado</p>
+                              </div>
+                            </div>
                           </div>
 
-                          <div className="flex items-center gap-4">
-                            <input 
-                              type="file" 
-                              accept="image/*"
-                              id="cover-upload"
-                              className="hidden"
-                              onChange={(e) => {
-                                if (e.target.files?.[0]) {
-                                  handleUpdateCover(e.target.files[0]);
-                                }
-                              }}
-                            />
-                            <button 
-                              onClick={() => document.getElementById('cover-upload')?.click()}
-                              disabled={isUpdatingCover}
-                              className={`bg-primary text-white font-bold px-6 py-3 rounded-2xl shadow-lg shadow-primary/20 active:scale-95 transition-all flex items-center gap-2 text-xs uppercase tracking-widest ${isUpdatingCover ? 'opacity-50 cursor-not-allowed' : ''}`}
-                            >
-                              {isUpdatingCover ? (
-                                <>
-                                  <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                                  ATUALIZANDO...
-                                </>
-                              ) : (
-                                <>
-                                  <Upload className="w-4 h-4" />
-                                  ALTERAR FOTO DE CAPA
-                                </>
-                              )}
-                            </button>
+                          {/* Favicon Upload */}
+                          <div className="bg-white p-8 rounded-3xl shadow-xl border border-primary/5">
+                            <div className="flex items-center gap-4 mb-6">
+                              <div className="w-10 h-10 bg-primary/10 rounded-xl flex items-center justify-center text-primary">
+                                <Settings className="w-5 h-5" />
+                              </div>
+                              <div>
+                                <h3 className="text-lg font-black text-on-surface font-headline leading-none">Favicon</h3>
+                                <p className="text-[10px] text-secondary mt-1">Ícone que aparece na aba do navegador</p>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-6">
+                              <div className="w-12 h-12 bg-surface-container-low rounded-xl flex items-center justify-center p-2 border border-primary/5">
+                                <img src={faviconUrl} alt="Favicon" className="w-8 h-8 object-contain" referrerPolicy="no-referrer" />
+                              </div>
+                              <div className="flex-1 space-y-3">
+                                <input 
+                                  type="file" 
+                                  accept="image/*"
+                                  id="favicon-upload"
+                                  className="hidden"
+                                  onChange={(e) => {
+                                    if (e.target.files?.[0]) {
+                                      handleUpdateFavicon(e.target.files[0]);
+                                    }
+                                  }}
+                                />
+                                <button 
+                                  onClick={() => document.getElementById('favicon-upload')?.click()}
+                                  disabled={isUpdatingFavicon}
+                                  className="w-full bg-primary/10 text-primary font-bold px-4 py-2.5 rounded-xl hover:bg-primary/20 transition-all text-[10px] uppercase tracking-widest flex items-center justify-center gap-2"
+                                >
+                                  {isUpdatingFavicon ? 'ATUALIZANDO...' : 'ALTERAR FAVICON'}
+                                </button>
+                                <p className="text-[9px] text-secondary font-medium uppercase tracking-widest">ICO ou PNG (32x32px)</p>
+                              </div>
+                            </div>
                           </div>
-                          <p className="text-[10px] text-secondary font-medium uppercase tracking-widest">Recomendado: 1920x1080px (Máx. 5MB)</p>
                         </div>
                       </div>
                     )}
@@ -3110,7 +3240,7 @@ export default function App() {
         </button>
         
         <img 
-          src={IMAGES.logo} 
+          src={logoUrl} 
           alt="ITERAIMA Logo" 
           className="h-12 w-auto object-contain mb-6 opacity-80"
           referrerPolicy="no-referrer"
