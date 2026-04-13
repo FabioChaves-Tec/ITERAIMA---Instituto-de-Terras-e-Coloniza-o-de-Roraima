@@ -86,6 +86,8 @@ const initDb = async () => {
       );
 
       INSERT INTO settings (key, value) VALUES ('cover_photo', '/uploads/default-cover.jpg') ON CONFLICT DO NOTHING;
+      INSERT INTO settings (key, value) VALUES ('logo_url', 'https://iteraimacidadao.rr.gov.br/cadastrousuarioexterno/include/images/marca/logo_iteraima.png') ON CONFLICT DO NOTHING;
+      INSERT INTO settings (key, value) VALUES ('favicon_url', 'https://iteraimacidadao.rr.gov.br/cadastrousuarioexterno/include/images/marca/logo_iteraima.png') ON CONFLICT DO NOTHING;
       
       -- Initialize presidencia if empty
       INSERT INTO presidencia (id, name, photo_url, biography) 
@@ -262,6 +264,46 @@ async function startServer() {
       res.json({ message: "Foto de capa atualizada" });
     } catch (err) {
       res.status(500).json({ message: "Erro ao atualizar foto de capa" });
+    }
+  });
+
+  app.get("/api/settings/logo", async (req, res) => {
+    try {
+      const { rows } = await pool.query("SELECT value FROM settings WHERE key = 'logo_url'");
+      res.json({ url: rows[0]?.value || "" });
+    } catch (err) {
+      res.status(500).json({ message: "Erro ao buscar logo" });
+    }
+  });
+
+  app.post("/api/settings/logo", authenticateToken, async (req: any, res) => {
+    if (req.user.role !== 'admin' && req.user.role !== 'editor') return res.sendStatus(403);
+    const { url } = req.body;
+    try {
+      await pool.query("INSERT INTO settings (key, value) VALUES ('logo_url', $1) ON CONFLICT (key) DO UPDATE SET value = $1", [url]);
+      res.json({ message: "Logo atualizado" });
+    } catch (err) {
+      res.status(500).json({ message: "Erro ao atualizar logo" });
+    }
+  });
+
+  app.get("/api/settings/favicon", async (req, res) => {
+    try {
+      const { rows } = await pool.query("SELECT value FROM settings WHERE key = 'favicon_url'");
+      res.json({ url: rows[0]?.value || "" });
+    } catch (err) {
+      res.status(500).json({ message: "Erro ao buscar favicon" });
+    }
+  });
+
+  app.post("/api/settings/favicon", authenticateToken, async (req: any, res) => {
+    if (req.user.role !== 'admin' && req.user.role !== 'editor') return res.sendStatus(403);
+    const { url } = req.body;
+    try {
+      await pool.query("INSERT INTO settings (key, value) VALUES ('favicon_url', $1) ON CONFLICT (key) DO UPDATE SET value = $1", [url]);
+      res.json({ message: "Favicon atualizado" });
+    } catch (err) {
+      res.status(500).json({ message: "Erro ao atualizar favicon" });
     }
   });
 
