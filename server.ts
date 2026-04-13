@@ -94,6 +94,14 @@ const initDb = async () => {
       SELECT 1, 'Presidente do ITERAIMA', 'https://picsum.photos/seed/president/400/400', 'Biografia do presidente...'
       WHERE NOT EXISTS (SELECT 1 FROM presidencia WHERE id = 1);
 
+      -- Ensure updated_at column exists in news table
+      DO $$ 
+      BEGIN 
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='news' AND column_name='updated_at') THEN 
+          ALTER TABLE news ADD COLUMN updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP; 
+        END IF; 
+      END $$;
+
       -- Ensure month column exists in documents table
       DO $$ 
       BEGIN 
