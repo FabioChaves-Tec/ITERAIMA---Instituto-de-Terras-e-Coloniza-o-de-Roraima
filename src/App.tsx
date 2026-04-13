@@ -107,7 +107,8 @@ export default function App() {
   const [showInstitucionalSub, setShowInstitucionalSub] = useState(false);
   const [showLegislacaoSub, setShowLegislacaoSub] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-  const [currentPage, setCurrentPage] = useState<'home' | 'news' | 'admin' | 'folder' | 'presidencia' | 'diretorias' | 'galeria'>('home');
+  const [currentPage, setCurrentPage] = useState<'home' | 'news' | 'admin' | 'folder' | 'presidencia' | 'diretorias' | 'galeria' | 'news-detail'>('home');
+  const [selectedNews, setSelectedNews] = useState<News | null>(null);
   const [adminTab, setAdminTab] = useState<'publish' | 'users' | 'documents' | 'settings'>('publish');
   const [selectedFolder, setSelectedFolder] = useState<{ label: string, items: any[] } | null>(null);
   const [selectedYear, setSelectedYear] = useState<string | null>(null);
@@ -1721,7 +1722,15 @@ export default function App() {
                   </div>
                 ) : newsList.length > 0 ? (
                   newsList.slice(0, 2).map((news, index) => (
-                    <article key={news.id} className={`${index === 0 ? 'group cursor-pointer' : 'flex gap-4 group cursor-pointer'}`}>
+                    <article 
+                      key={news.id} 
+                      onClick={() => {
+                        setSelectedNews(news);
+                        setCurrentPage('news-detail');
+                        scrollToTop();
+                      }}
+                      className={`${index === 0 ? 'group cursor-pointer' : 'flex gap-4 group cursor-pointer'}`}
+                    >
                       {index === 0 ? (
                         <>
                           <div className="relative w-full aspect-[16/10] rounded-3xl overflow-hidden mb-4">
@@ -1795,7 +1804,15 @@ export default function App() {
             ) : (
               <div className="grid gap-8">
                 {newsList.map((news) => (
-                  <article key={news.id} className="bg-white rounded-3xl overflow-hidden shadow-sm border border-primary/5 group">
+                  <article 
+                    key={news.id} 
+                    onClick={() => {
+                      setSelectedNews(news);
+                      setCurrentPage('news-detail');
+                      scrollToTop();
+                    }}
+                    className="bg-white rounded-3xl overflow-hidden shadow-sm border border-primary/5 group cursor-pointer"
+                  >
                     <div className="relative aspect-[16/9]">
                       <img 
                         src={news.image_url || IMAGES.news1} 
@@ -1822,13 +1839,19 @@ export default function App() {
                             {deletingId === news.id ? (
                               <div className="flex items-center gap-1">
                                 <button 
-                                  onClick={() => handleDeleteNews(news.id)}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleDeleteNews(news.id);
+                                  }}
                                   className="px-3 py-1 bg-red-500 text-white text-[10px] font-bold rounded-lg hover:bg-red-600 transition-colors"
                                 >
                                   CONFIRMAR
                                 </button>
                                 <button 
-                                  onClick={() => setDeletingId(null)}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setDeletingId(null);
+                                  }}
                                   className="px-3 py-1 bg-gray-200 text-gray-600 text-[10px] font-bold rounded-lg hover:bg-gray-300 transition-colors"
                                 >
                                   CANCELAR
@@ -1836,7 +1859,10 @@ export default function App() {
                               </div>
                             ) : (
                               <button 
-                                onClick={() => setDeletingId(news.id)}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setDeletingId(news.id);
+                                }}
                                 className="p-2 text-red-500 hover:bg-red-50 rounded-full transition-colors"
                                 title="Excluir notícia"
                               >
@@ -1863,6 +1889,55 @@ export default function App() {
                 )}
               </div>
             )}
+          </motion.div>
+        )}
+
+        {currentPage === 'news-detail' && selectedNews && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="px-6 py-8"
+          >
+            <button 
+              onClick={() => setCurrentPage('home')}
+              className="flex items-center gap-2 text-primary font-bold text-xs uppercase tracking-widest mb-8 hover:bg-primary/5 px-4 py-2 rounded-xl transition-all w-fit"
+            >
+              <ArrowLeft className="w-4 h-4" />
+              Voltar para Início
+            </button>
+
+            <article className="bg-white rounded-[40px] overflow-hidden shadow-2xl shadow-primary/5 border border-primary/5">
+              <div className="relative aspect-[16/9] md:aspect-[21/9]">
+                <img 
+                  src={selectedNews.image_url || IMAGES.news1} 
+                  alt={selectedNews.title}
+                  className="w-full h-full object-cover"
+                  referrerPolicy="no-referrer"
+                />
+                <div className="absolute top-6 left-6">
+                  <span className="px-4 py-2 bg-primary text-white text-xs font-bold rounded-full uppercase tracking-wider shadow-lg">
+                    {selectedNews.category}
+                  </span>
+                </div>
+              </div>
+              
+              <div className="p-8 md:p-12">
+                <div className="flex items-center gap-3 text-secondary font-medium uppercase tracking-widest text-[10px] mb-6">
+                  <Calendar className="w-4 h-4 text-primary" />
+                  <span>{new Date(selectedNews.created_at).toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' })}</span>
+                </div>
+                
+                <h1 className="text-3xl md:text-5xl font-black text-on-surface font-headline leading-tight mb-8">
+                  {selectedNews.title}
+                </h1>
+                
+                <div className="prose prose-primary max-w-none">
+                  <p className="text-lg text-on-surface-variant leading-relaxed whitespace-pre-wrap">
+                    {selectedNews.content}
+                  </p>
+                </div>
+              </div>
+            </article>
           </motion.div>
         )}
 
