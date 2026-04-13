@@ -55,3 +55,33 @@
 .markdown-body h1, .markdown-body h2, .markdown-body h3 {
   @apply font-headline font-black text-primary mt-4 mb-2;
 }
+
+/* Quill Editor Customization */
+.news-editor .ql-toolbar {
+  @apply border-none bg-surface-container-high rounded-t-2xl;
+}
+
+.news-editor .ql-container {
+  @apply border-none min-h-[300px] text-sm font-body;
+}
+
+.news-editor .ql-editor {
+  @apply px-4 py-3;
+}
+
+.news-editor .ql-editor.ql-blank::before {
+  @apply text-secondary opacity-50 left-4;
+}
+
+/* Rendered Quill Content */
+.quill-content a {
+  @apply text-primary underline font-bold transition-all hover:opacity-80;
+}
+
+.quill-content p {
+  @apply mb-4 last:mb-0;
+}
+
+.quill-content strong {
+  @apply font-black;
+}
