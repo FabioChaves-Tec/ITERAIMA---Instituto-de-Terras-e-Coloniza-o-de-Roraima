@@ -129,6 +129,16 @@ export const api = {
     return res.json();
   },
 
+  async updateNews(id: number, news: Partial<News>) {
+    const res = await fetch(`${API_URL}/api/news/${id}`, {
+      method: 'PUT',
+      headers: getHeaders(),
+      body: JSON.stringify(news)
+    });
+    if (!res.ok) throw new Error('Erro ao atualizar notícia');
+    return res.json();
+  },
+
   async getDocuments(): Promise<TransparencyDocument[]> {
     const res = await fetch(`${API_URL}/api/documents`);
     if (!res.ok) throw new Error('Erro ao buscar documentos');

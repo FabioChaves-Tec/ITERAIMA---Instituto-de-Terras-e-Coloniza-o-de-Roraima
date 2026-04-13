@@ -437,6 +437,21 @@ async function startServer() {
     }
   });
 
+  app.put("/api/news/:id", authenticateToken, async (req: any, res) => {
+    if (req.user.role !== 'admin' && req.user.role !== 'editor') return res.sendStatus(403);
+    const { id } = req.params;
+    const { title, content, category, image_url } = req.body;
+    try {
+      await pool.query(
+        "UPDATE news SET title = $1, content = $2, category = $3, image_url = $4, updated_at = CURRENT_TIMESTAMP WHERE id = $5",
+        [title, content, category, image_url, id]
+      );
+      res.json({ message: "Notícia atualizada" });
+    } catch (err) {
+      res.status(500).json({ message: "Erro ao atualizar notícia" });
+    }
+  });
+
   // Documents Routes
   app.get("/api/documents", async (req, res) => {
     try {
