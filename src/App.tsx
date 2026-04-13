@@ -117,6 +117,7 @@ const stripHtml = (html: string) => {
   return html.replace(/<[^>]*>?/gm, '');
 };
 
+// ITERAIMA Portal - v1.0.2
 export default function App() {
   const [showTransparenciaSub, setShowTransparenciaSub] = useState(false);
   const [openLevel2Menu, setOpenLevel2Menu] = useState<string | null>(null);
