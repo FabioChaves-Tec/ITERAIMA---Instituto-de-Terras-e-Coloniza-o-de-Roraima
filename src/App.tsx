@@ -114,7 +114,9 @@ const quillModules = {
 };
 
 const stripHtml = (html: string) => {
-  return html.replace(/<[^>]*>?/gm, '');
+  if (typeof window === 'undefined') return html.replace(/<[^>]*>?/gm, '');
+  const doc = new DOMParser().parseFromString(html, 'text/html');
+  return doc.body.textContent || "";
 };
 
 // ITERAIMA Portal - v1.0.2
@@ -128,6 +130,7 @@ export default function App() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [currentPage, setCurrentPage] = useState<'home' | 'news' | 'admin' | 'folder' | 'presidencia' | 'diretorias' | 'galeria' | 'news-detail'>('home');
   const [selectedNews, setSelectedNews] = useState<News | null>(null);
+  const [editingNewsId, setEditingNewsId] = useState<number | null>(null);
   const [adminTab, setAdminTab] = useState<'publish' | 'users' | 'documents' | 'settings'>('publish');
   const [selectedFolder, setSelectedFolder] = useState<{ label: string, items: any[] } | null>(null);
   const [selectedYear, setSelectedYear] = useState<string | null>(null);
@@ -492,17 +495,29 @@ export default function App() {
         imageUrl = uploadRes.url;
       }
 
-      await api.publishNews({
-        title: newTitle,
-        content: newContent,
-        category: newCategory,
-        image_url: imageUrl
-      });
+      if (editingNewsId) {
+        await api.updateNews(editingNewsId, {
+          title: newTitle,
+          content: newContent,
+          category: newCategory,
+          image_url: imageUrl
+        });
+        toast.success('Notícia atualizada com sucesso!');
+      } else {
+        await api.publishNews({
+          title: newTitle,
+          content: newContent,
+          category: newCategory,
+          image_url: imageUrl
+        });
+        toast.success('Notícia publicada com sucesso!');
+      }
       
       setNewTitle('');
       setNewContent('');
       setNewImageUrl('');
       setNewImageFile(null);
+      setEditingNewsId(null);
       setPublishSuccess(true);
       
       // Refresh news
@@ -511,10 +526,29 @@ export default function App() {
       
       setTimeout(() => setPublishSuccess(false), 3000);
     } catch (error) {
-      setPublishError('Erro ao publicar notícia. Verifique sua conexão.');
+      setPublishError('Erro ao processar notícia. Verifique sua conexão.');
     } finally {
       setIsPublishing(false);
     }
+  };
+
+  const handleEditNews = (news: News) => {
+    setEditingNewsId(news.id);
+    setNewTitle(news.title);
+    setNewContent(news.content);
+    setNewCategory(news.category);
+    setNewImageUrl(news.image_url);
+    setAdminTab('publish');
+    scrollToTop();
+  };
+
+  const handleCancelEdit = () => {
+    setEditingNewsId(null);
+    setNewTitle('');
+    setNewContent('');
+    setNewCategory('REGULARIZAÇÃO');
+    setNewImageUrl('');
+    setNewImageFile(null);
   };
 
   const handleDeleteNews = async (id: any) => {
@@ -1789,13 +1823,13 @@ export default function App() {
                 </button>
               </div>
 
-              <div className="space-y-8">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                 {isLoading ? (
-                  <div className="flex justify-center py-12">
+                  <div className="flex justify-center py-12 col-span-full">
                     <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
                   </div>
                 ) : newsList.length > 0 ? (
-                  newsList.slice(0, 2).map((news, index) => (
+                  newsList.slice(0, 2).map((news) => (
                     <article 
                       key={news.id} 
                       onClick={() => {
@@ -1803,56 +1837,35 @@ export default function App() {
                         setCurrentPage('news-detail');
                         scrollToTop();
                       }}
-                      className={`${index === 0 ? 'group cursor-pointer' : 'flex gap-4 group cursor-pointer'}`}
+                      className="group cursor-pointer bg-white rounded-3xl overflow-hidden shadow-sm hover:shadow-xl transition-all border border-primary/5"
                     >
-                      {index === 0 ? (
-                        <>
-                          <div className="relative w-full aspect-[16/10] rounded-3xl overflow-hidden mb-4">
-                            <img 
-                              className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" 
-                              src={news.image_url || IMAGES.news1} 
-                              alt={news.title}
-                              referrerPolicy="no-referrer"
-                            />
-                            <div className="absolute top-4 left-4">
-                              <span className="px-3 py-1 bg-white/90 glass text-primary text-[10px] font-bold rounded-full uppercase">{news.category}</span>
-                            </div>
-                          </div>
-                          <div className="space-y-2">
-                            <div className="flex items-center gap-2 text-[10px] text-secondary font-medium uppercase tracking-wider">
-                              <Calendar className="w-3 h-3" />
-                              <span>{new Date(news.created_at).toLocaleDateString('pt-BR')}</span>
-                            </div>
-                            <h3 className="text-xl font-bold text-on-surface font-headline leading-tight group-hover:text-primary transition-colors">
-                              {news.title}
-                            </h3>
-                            <p className="text-sm text-on-surface-variant leading-relaxed line-clamp-2">
-                              {stripHtml(news.content)}
-                            </p>
-                          </div>
-                        </>
-                      ) : (
-                        <>
-                          <div className="w-24 h-24 shrink-0 rounded-2xl overflow-hidden relative">
-                            <img 
-                              className="w-full h-full object-cover" 
-                              src={news.image_url || IMAGES.news2} 
-                              alt={news.title}
-                              referrerPolicy="no-referrer"
-                            />
-                          </div>
-                          <div className="flex flex-col justify-center">
-                            <span className="text-[10px] text-primary font-bold uppercase tracking-wider mb-1">{news.category}</span>
-                            <h3 className="text-sm font-bold text-on-surface font-headline leading-snug line-clamp-2 group-hover:text-primary transition-colors">
-                              {news.title}
-                            </h3>
-                          </div>
-                        </>
-                      )}
+                      <div className="relative aspect-[16/10] overflow-hidden">
+                        <img 
+                          className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" 
+                          src={news.image_url || IMAGES.news1} 
+                          alt={news.title}
+                          referrerPolicy="no-referrer"
+                        />
+                        <div className="absolute top-4 left-4">
+                          <span className="px-3 py-1 bg-white/90 glass text-primary text-[10px] font-bold rounded-full uppercase tracking-widest">{news.category}</span>
+                        </div>
+                      </div>
+                      <div className="p-6 space-y-3">
+                        <div className="flex items-center gap-2 text-[10px] text-secondary font-bold uppercase tracking-widest">
+                          <Calendar className="w-3 h-3" />
+                          <span>{new Date(news.created_at!).toLocaleDateString('pt-BR')}</span>
+                        </div>
+                        <h3 className="text-xl font-black text-on-surface font-headline leading-tight group-hover:text-primary transition-colors line-clamp-2">
+                          {news.title}
+                        </h3>
+                        <p className="text-sm text-secondary leading-relaxed line-clamp-2">
+                          {stripHtml(news.content)}
+                        </p>
+                      </div>
                     </article>
                   ))
                 ) : (
-                  <p className="text-center text-secondary py-8">Nenhuma notícia em destaque.</p>
+                  <p className="text-center text-secondary py-8 col-span-full">Nenhuma notícia em destaque.</p>
                 )}
               </div>
             </section>
@@ -2305,116 +2318,177 @@ export default function App() {
                 )}
 
                 {adminTab === 'publish' && (
-                  <form onSubmit={handlePublish} className="bg-white p-8 rounded-3xl shadow-xl border border-primary/5 space-y-6">
-                    <div className="flex items-center gap-3 mb-2">
-                      <div className="w-8 h-8 bg-primary/10 rounded-lg flex items-center justify-center text-primary">
-                        <Plus className="w-4 h-4" />
-                      </div>
-                      <h3 className="text-lg font-black text-on-surface font-headline uppercase tracking-wider">Nova Notícia</h3>
-                    </div>
-                    <div className="grid gap-6">
-                      <div>
-                        <label className="block text-[10px] font-bold text-secondary uppercase tracking-widest mb-1.5 ml-1">Título da Notícia</label>
-                        <input 
-                          type="text" 
-                          value={newTitle}
-                          onChange={(e) => setNewTitle(e.target.value)}
-                          className="w-full bg-surface-container-low border-none rounded-2xl px-4 py-3 text-sm focus:ring-2 focus:ring-primary transition-all"
-                          placeholder="Ex: Novo mutirão de regularização..."
-                          required
-                        />
-                      </div>
-                      
-                      <div className="grid grid-cols-2 gap-4">
-                        <div>
-                          <label className="block text-[10px] font-bold text-secondary uppercase tracking-widest mb-1.5 ml-1">Categoria</label>
-                          <select 
-                            value={newCategory}
-                            onChange={(e) => setNewCategory(e.target.value)}
-                            className="w-full bg-surface-container-low border-none rounded-2xl px-4 py-3 text-sm focus:ring-2 focus:ring-primary transition-all"
-                          >
-                            <option value="REGULARIZAÇÃO">REGULARIZAÇÃO</option>
-                            <option value="INSTITUCIONAL">INSTITUCIONAL</option>
-                            <option value="PRODUTOR RURAL">PRODUTOR RURAL</option>
-                            <option value="AVISO">AVISO</option>
-                          </select>
+                  <div className="space-y-8">
+                    <form onSubmit={handlePublish} className="bg-white p-8 rounded-3xl shadow-xl border border-primary/5 space-y-6">
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="flex items-center gap-3">
+                          <div className="w-8 h-8 bg-primary/10 rounded-lg flex items-center justify-center text-primary">
+                            {editingNewsId ? <Settings className="w-4 h-4" /> : <Plus className="w-4 h-4" />}
+                          </div>
+                          <h3 className="text-lg font-black text-on-surface font-headline uppercase tracking-wider">
+                            {editingNewsId ? 'Editar Notícia' : 'Nova Notícia'}
+                          </h3>
                         </div>
+                        {editingNewsId && (
+                          <button 
+                            type="button"
+                            onClick={handleCancelEdit}
+                            className="text-xs font-bold text-red-500 hover:bg-red-50 px-3 py-1.5 rounded-lg transition-all"
+                          >
+                            CANCELAR EDIÇÃO
+                          </button>
+                        )}
+                      </div>
+                      <div className="grid gap-6">
                         <div>
-                          <label className="block text-[10px] font-bold text-secondary uppercase tracking-widest mb-1.5 ml-1">Imagem da Notícia</label>
-                          <div className="relative">
-                            <input 
-                              type="file" 
-                              accept="image/*"
-                              onChange={(e) => setNewImageFile(e.target.files ? e.target.files[0] : null)}
-                              className="hidden"
-                              id="news-image-upload"
-                            />
-                            <label 
-                              htmlFor="news-image-upload"
-                              className="w-full flex items-center justify-between bg-surface-container-low border-2 border-dashed border-primary/10 rounded-2xl px-4 py-3 text-sm cursor-pointer hover:bg-primary/5 transition-all"
+                          <label className="block text-[10px] font-bold text-secondary uppercase tracking-widest mb-1.5 ml-1">Título da Notícia</label>
+                          <input 
+                            type="text" 
+                            value={newTitle}
+                            onChange={(e) => setNewTitle(e.target.value)}
+                            className="w-full bg-surface-container-low border-none rounded-2xl px-4 py-3 text-sm focus:ring-2 focus:ring-primary transition-all"
+                            placeholder="Ex: Novo mutirão de regularização..."
+                            required
+                          />
+                        </div>
+                        
+                        <div className="grid grid-cols-2 gap-4">
+                          <div>
+                            <label className="block text-[10px] font-bold text-secondary uppercase tracking-widest mb-1.5 ml-1">Categoria</label>
+                            <select 
+                              value={newCategory}
+                              onChange={(e) => setNewCategory(e.target.value)}
+                              className="w-full bg-surface-container-low border-none rounded-2xl px-4 py-3 text-sm focus:ring-2 focus:ring-primary transition-all"
                             >
-                              <span className="text-secondary truncate">
-                                {newImageFile ? newImageFile.name : 'Selecionar imagem...'}
-                              </span>
-                              <Image className="w-4 h-4 text-primary" />
-                            </label>
+                              <option value="REGULARIZAÇÃO">REGULARIZAÇÃO</option>
+                              <option value="INSTITUCIONAL">INSTITUCIONAL</option>
+                              <option value="PRODUTOR RURAL">PRODUTOR RURAL</option>
+                              <option value="AVISO">AVISO</option>
+                            </select>
+                          </div>
+                          <div>
+                            <label className="block text-[10px] font-bold text-secondary uppercase tracking-widest mb-1.5 ml-1">Imagem da Notícia</label>
+                            <div className="relative">
+                              <input 
+                                type="file" 
+                                accept="image/*"
+                                onChange={(e) => setNewImageFile(e.target.files ? e.target.files[0] : null)}
+                                className="hidden"
+                                id="news-image-upload"
+                              />
+                              <label 
+                                htmlFor="news-image-upload"
+                                className="w-full flex items-center justify-between bg-surface-container-low border-2 border-dashed border-primary/10 rounded-2xl px-4 py-3 text-sm cursor-pointer hover:bg-primary/5 transition-all"
+                              >
+                                <span className="text-secondary truncate">
+                                  {newImageFile ? newImageFile.name : 'Selecionar imagem...'}
+                                </span>
+                                <Image className="w-4 h-4 text-primary" />
+                              </label>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div>
+                          <label className="block text-[10px] font-bold text-secondary uppercase tracking-widest mb-1.5 ml-1">Conteúdo</label>
+                          <div className="bg-surface-container-low rounded-2xl overflow-hidden border-none">
+                            <ReactQuill 
+                              theme="snow"
+                              value={newContent}
+                              onChange={setNewContent}
+                              modules={quillModules}
+                              placeholder="Escreva o corpo da notícia aqui..."
+                              className="news-editor"
+                            />
                           </div>
                         </div>
                       </div>
 
-                      <div>
-                        <label className="block text-[10px] font-bold text-secondary uppercase tracking-widest mb-1.5 ml-1">Conteúdo</label>
-                        <div className="bg-surface-container-low rounded-2xl overflow-hidden border-none">
-                          <ReactQuill 
-                            theme="snow"
-                            value={newContent}
-                            onChange={setNewContent}
-                            modules={quillModules}
-                            placeholder="Escreva o corpo da notícia aqui..."
-                            className="news-editor"
-                          />
+                      <button 
+                        type="submit"
+                        disabled={isPublishing}
+                        className={`w-full ${isPublishing ? 'bg-gray-400' : 'bg-primary'} text-white font-bold py-4 rounded-2xl shadow-lg shadow-primary/20 active:scale-95 transition-all flex items-center justify-center gap-2`}
+                      >
+                        {isPublishing ? (
+                          <>
+                            <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                            {editingNewsId ? 'ATUALIZANDO...' : 'PUBLICANDO...'}
+                          </>
+                        ) : (
+                          <>
+                            {editingNewsId ? <Settings className="w-5 h-5" /> : <Plus className="w-5 h-5" />}
+                            {editingNewsId ? 'ATUALIZAR NOTÍCIA' : 'PUBLICAR AGORA'}
+                          </>
+                        )}
+                      </button>
+
+                      {publishSuccess && (
+                        <motion.div 
+                          initial={{ opacity: 0, y: 10 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          className="bg-green-50 text-green-600 p-4 rounded-2xl text-center text-sm font-bold border border-green-100 mt-4"
+                        >
+                          Notícia {editingNewsId ? 'atualizada' : 'publicada'} com sucesso!
+                        </motion.div>
+                      )}
+
+                      {publishError && (
+                        <motion.div 
+                          initial={{ opacity: 0, y: 10 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          className="bg-red-50 text-red-600 p-4 rounded-2xl text-center text-sm font-bold border border-red-100 mt-4"
+                        >
+                          {publishError}
+                        </motion.div>
+                      )}
+                    </form>
+
+                    {/* News Management List */}
+                    <div className="bg-white p-8 rounded-3xl shadow-xl border border-primary/5">
+                      <div className="flex items-center gap-4 mb-8">
+                        <div className="w-12 h-12 bg-primary/10 rounded-2xl flex items-center justify-center text-primary">
+                          <Newspaper className="w-6 h-6" />
+                        </div>
+                        <div>
+                          <h3 className="text-2xl font-black text-on-surface font-headline leading-none">Gerenciar Notícias</h3>
+                          <p className="text-xs text-secondary mt-1">Edite ou remova notícias publicadas</p>
                         </div>
                       </div>
+
+                      <div className="space-y-4">
+                        {newsList.map((news) => (
+                          <div key={news.id} className="bg-surface-container-low p-4 rounded-2xl flex items-center gap-4 border border-primary/5 group">
+                            <img src={news.image_url} alt="" className="w-16 h-16 rounded-xl object-cover shadow-sm" referrerPolicy="no-referrer" />
+                            <div className="flex-1 min-w-0">
+                              <h4 className="font-bold text-on-surface truncate">{news.title}</h4>
+                              <p className="text-[10px] text-secondary uppercase tracking-widest mt-1">
+                                {news.category} • {new Date(news.created_at!).toLocaleDateString()}
+                              </p>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <button 
+                                onClick={() => handleEditNews(news)}
+                                className="p-2 text-primary hover:bg-primary/10 rounded-xl transition-all"
+                                title="Editar"
+                              >
+                                <Settings className="w-4 h-4" />
+                              </button>
+                              <button 
+                                onClick={() => handleDeleteNews(news.id)}
+                                className="p-2 text-red-500 hover:bg-red-50 rounded-xl transition-all"
+                                title="Excluir"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                        {newsList.length === 0 && (
+                          <p className="text-center text-secondary py-8 italic">Nenhuma notícia publicada.</p>
+                        )}
+                      </div>
                     </div>
-
-                    <button 
-                      type="submit"
-                      disabled={isPublishing}
-                      className={`w-full ${isPublishing ? 'bg-gray-400' : 'bg-primary'} text-white font-bold py-4 rounded-2xl shadow-lg shadow-primary/20 active:scale-95 transition-all flex items-center justify-center gap-2`}
-                    >
-                      {isPublishing ? (
-                        <>
-                          <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                          PUBLICANDO...
-                        </>
-                      ) : (
-                        <>
-                          <Plus className="w-5 h-5" />
-                          PUBLICAR AGORA
-                        </>
-                      )}
-                    </button>
-
-                    {publishSuccess && (
-                      <motion.div 
-                        initial={{ opacity: 0, y: 10 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        className="bg-green-50 text-green-600 p-4 rounded-2xl text-center text-sm font-bold border border-green-100 mt-4"
-                      >
-                        Notícia publicada com sucesso!
-                      </motion.div>
-                    )}
-
-                    {publishError && (
-                      <motion.div 
-                        initial={{ opacity: 0, y: 10 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        className="bg-red-50 text-red-600 p-4 rounded-2xl text-center text-sm font-bold border border-red-100 mt-4"
-                      >
-                        {publishError}
-                      </motion.div>
-                    )}
-                  </form>
+                  </div>
                 )}
 
                 {adminTab === 'users' && user?.role === 'admin' && (
