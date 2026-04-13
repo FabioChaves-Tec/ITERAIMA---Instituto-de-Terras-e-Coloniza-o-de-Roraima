@@ -526,7 +526,8 @@ export default function App() {
       
       setTimeout(() => setPublishSuccess(false), 3000);
     } catch (error) {
-      setPublishError('Erro ao processar notícia. Verifique sua conexão.');
+      console.error('Erro ao processar notícia:', error);
+      setPublishError(error instanceof Error ? error.message : 'Erro ao processar notícia. Verifique sua conexão.');
     } finally {
       setIsPublishing(false);
     }
