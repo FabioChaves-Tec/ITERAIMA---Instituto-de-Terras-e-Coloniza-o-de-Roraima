@@ -99,6 +99,24 @@ const MONTHS = [
   'JULHO', 'AGOSTO', 'SETEMBRO', 'OUTUBRO', 'NOVEMBRO', 'DEZEMBRO'
 ];
 
+import ReactQuill from 'react-quill-new';
+import 'react-quill-new/dist/quill.snow.css';
+
+const quillModules = {
+  toolbar: [
+    [{ 'header': [1, 2, false] }],
+    ['bold', 'italic', 'underline', 'strike'],
+    [{'list': 'ordered'}, {'list': 'bullet'}],
+    ['link'],
+    [{ 'color': [] }, { 'background': [] }],
+    ['clean']
+  ],
+};
+
+const stripHtml = (html: string) => {
+  return html.replace(/<[^>]*>?/gm, '');
+};
+
 export default function App() {
   const [showTransparenciaSub, setShowTransparenciaSub] = useState(false);
   const [openLevel2Menu, setOpenLevel2Menu] = useState<string | null>(null);
@@ -438,6 +456,13 @@ export default function App() {
     setIsPublishing(true);
     setPublishError('');
     setPublishSuccess(false);
+    
+    if (!newContent || newContent === '<p><br></p>') {
+      setPublishError('O conteúdo da notícia é obrigatório');
+      setIsPublishing(false);
+      return;
+    }
+
     try {
       let imageUrl = newImageUrl;
       
@@ -1753,7 +1778,7 @@ export default function App() {
                               {news.title}
                             </h3>
                             <p className="text-sm text-on-surface-variant leading-relaxed line-clamp-2">
-                              {news.content}
+                              {stripHtml(news.content)}
                             </p>
                           </div>
                         </>
@@ -1875,9 +1900,10 @@ export default function App() {
                       <h3 className="text-xl font-bold text-on-surface font-headline mb-3 group-hover:text-primary transition-colors">
                         {news.title}
                       </h3>
-                      <p className="text-sm text-on-surface-variant leading-relaxed whitespace-pre-wrap">
-                        {news.content}
-                      </p>
+                      <div 
+                        className="text-sm text-on-surface-variant leading-relaxed line-clamp-3 quill-content"
+                        dangerouslySetInnerHTML={{ __html: news.content }}
+                      />
                     </div>
                   </article>
                 ))}
@@ -1931,11 +1957,10 @@ export default function App() {
                   {selectedNews.title}
                 </h1>
                 
-                <div className="prose prose-primary max-w-none">
-                  <p className="text-lg text-on-surface-variant leading-relaxed whitespace-pre-wrap">
-                    {selectedNews.content}
-                  </p>
-                </div>
+                <div 
+                  className="prose prose-primary max-w-none text-lg text-on-surface-variant leading-relaxed quill-content"
+                  dangerouslySetInnerHTML={{ __html: selectedNews.content }}
+                />
               </div>
             </article>
           </motion.div>
@@ -2290,13 +2315,16 @@ export default function App() {
 
                       <div>
                         <label className="block text-[10px] font-bold text-secondary uppercase tracking-widest mb-1.5 ml-1">Conteúdo</label>
-                        <textarea 
-                          value={newContent}
-                          onChange={(e) => setNewContent(e.target.value)}
-                          className="w-full bg-surface-container-low border-none rounded-2xl px-4 py-3 text-sm focus:ring-2 focus:ring-primary transition-all min-h-[200px]"
-                          placeholder="Escreva o corpo da notícia aqui..."
-                          required
-                        />
+                        <div className="bg-surface-container-low rounded-2xl overflow-hidden border-none">
+                          <ReactQuill 
+                            theme="snow"
+                            value={newContent}
+                            onChange={setNewContent}
+                            modules={quillModules}
+                            placeholder="Escreva o corpo da notícia aqui..."
+                            className="news-editor"
+                          />
+                        </div>
                       </div>
                     </div>
 
