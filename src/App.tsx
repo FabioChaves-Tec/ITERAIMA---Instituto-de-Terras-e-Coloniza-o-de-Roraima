@@ -3149,13 +3149,13 @@ export default function App() {
           <motion.div 
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            className="max-w-5xl mx-auto px-6 py-12"
+            className="max-w-4xl mx-auto px-6 py-12"
           >
             {presidencia ? (
-              <div className="bg-white rounded-[3rem] shadow-2xl border border-primary/5 p-8 lg:p-12">
-                <div className="flex flex-col md:flex-row gap-10 lg:gap-14 items-start">
-                  <div className="w-full md:w-[38%] shrink-0">
-                    <div className="aspect-[3/4] rounded-[2.5rem] overflow-hidden shadow-2xl border-[10px] border-primary/5 bg-surface-container-low transition-transform hover:scale-[1.01] duration-500">
+              <div className="bg-white rounded-[2.5rem] shadow-xl border border-primary/5 overflow-hidden">
+                <div className="md:flex items-start">
+                  <div className="md:w-2/5 p-8 lg:p-10 shrink-0">
+                    <div className="aspect-[4/5] rounded-3xl overflow-hidden shadow-lg border-4 border-primary/10 bg-surface-container-low">
                       <img 
                         src={presidencia.photo_url} 
                         alt={presidencia.name} 
@@ -3164,13 +3164,11 @@ export default function App() {
                       />
                     </div>
                   </div>
-                  <div className="flex-1 min-w-0">
-                    <h1 className="text-3xl md:text-4xl lg:text-5xl font-black text-primary font-headline mb-3 uppercase tracking-tight leading-[0.9]">
-                      {presidencia.name}
-                    </h1>
-                    <div className="h-2 w-24 bg-primary rounded-full mb-10" />
+                  <div className="md:w-3/5 p-8 lg:p-10 md:pl-0">
+                    <h1 className="text-3xl font-black text-primary font-headline mb-2 uppercase tracking-tight">{presidencia.name}</h1>
+                    <div className="h-1.5 w-20 bg-primary rounded-full mb-6" />
                     <div 
-                      className="quill-content text-secondary leading-relaxed text-lg lg:text-xl"
+                      className="quill-content text-secondary leading-relaxed text-base"
                       dangerouslySetInnerHTML={{ __html: presidencia.biography }}
                     />
                   </div>
