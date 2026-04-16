@@ -3149,13 +3149,13 @@ export default function App() {
           <motion.div 
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            className="max-w-4xl mx-auto px-6 py-12"
+            className="max-w-5xl mx-auto px-6 py-12"
           >
             {presidencia ? (
               <div className="bg-white rounded-[2.5rem] shadow-xl border border-primary/5 overflow-hidden">
                 <div className="md:flex items-center">
-                  <div className="md:w-2/5 p-8">
-                    <div className="aspect-[4/5] rounded-3xl overflow-hidden shadow-lg border-4 border-primary/10 bg-surface-container-low">
+                  <div className="md:w-[45%] p-10">
+                    <div className="aspect-[3/4] rounded-[2.5rem] overflow-hidden shadow-2xl border-8 border-primary/5 bg-surface-container-low transition-transform hover:scale-[1.02] duration-500">
                       <img 
                         src={presidencia.photo_url} 
                         alt={presidencia.name} 
@@ -3164,12 +3164,13 @@ export default function App() {
                       />
                     </div>
                   </div>
-                  <div className="md:w-3/5 p-8 md:pl-0">
-                    <h1 className="text-3xl font-black text-primary font-headline mb-2 uppercase">{presidencia.name}</h1>
-                    <div className="h-1 w-20 bg-primary rounded-full mb-6" />
-                    <div className="prose prose-sm max-w-none text-secondary leading-relaxed whitespace-pre-wrap">
-                      {presidencia.biography}
-                    </div>
+                  <div className="md:w-[55%] p-10 md:pl-0">
+                    <h1 className="text-3xl md:text-4xl font-black text-primary font-headline mb-2 uppercase tracking-tight">{presidencia.name}</h1>
+                    <div className="h-1.5 w-24 bg-primary rounded-full mb-8" />
+                    <div 
+                      className="quill-content text-secondary leading-relaxed text-lg"
+                      dangerouslySetInnerHTML={{ __html: presidencia.biography }}
+                    />
                   </div>
                 </div>
               </div>
