@@ -3152,10 +3152,10 @@ export default function App() {
             className="max-w-5xl mx-auto px-6 py-12"
           >
             {presidencia ? (
-              <div className="bg-white rounded-[2.5rem] shadow-xl border border-primary/5">
-                <div className="md:flex">
-                  <div className="md:w-[42%] p-8 lg:p-10">
-                    <div className="aspect-[3/4] rounded-[2.5rem] overflow-hidden shadow-2xl border-8 border-primary/5 bg-surface-container-low transition-transform hover:scale-[1.02] duration-500 sticky top-8">
+              <div className="bg-white rounded-[2.5rem] shadow-xl border border-primary/5 overflow-hidden">
+                <div className="md:flex items-start">
+                  <div className="md:w-[40%] p-8 lg:p-10">
+                    <div className="aspect-[3/4] rounded-[2.5rem] overflow-hidden shadow-2xl border-8 border-primary/5 bg-surface-container-low">
                       <img 
                         src={presidencia.photo_url} 
                         alt={presidencia.name} 
@@ -3164,11 +3164,11 @@ export default function App() {
                       />
                     </div>
                   </div>
-                  <div className="md:w-[58%] p-8 lg:p-10 md:pl-0 lg:pl-0">
-                    <h1 className="text-3xl md:text-4xl font-black text-primary font-headline mb-2 uppercase tracking-tight">{presidencia.name}</h1>
+                  <div className="md:w-[60%] p-8 lg:p-10 md:pl-0">
+                    <h1 className="text-3xl md:text-4xl font-black text-primary font-headline mb-3 uppercase tracking-tight leading-tight">{presidencia.name}</h1>
                     <div className="h-1.5 w-24 bg-primary rounded-full mb-8" />
                     <div 
-                      className="quill-content text-secondary leading-relaxed text-lg pb-4"
+                      className="quill-content text-secondary leading-relaxed text-lg"
                       dangerouslySetInnerHTML={{ __html: presidencia.biography }}
                     />
                   </div>
