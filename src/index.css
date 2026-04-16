@@ -74,6 +74,12 @@
 }
 
 /* Rendered Quill Content */
+.quill-content {
+  @apply overflow-hidden break-words;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+}
+
 .quill-content a {
   @apply text-primary underline font-bold transition-all hover:opacity-80;
 }
