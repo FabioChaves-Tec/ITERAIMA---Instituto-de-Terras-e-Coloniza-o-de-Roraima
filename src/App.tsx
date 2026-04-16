@@ -256,6 +256,15 @@ export default function App() {
     return () => clearInterval(interval);
   }, []);
 
+  const initializedPres = React.useRef(false);
+  useEffect(() => {
+    if (presidencia && !initializedPres.current) {
+      setPresName(presidencia.name || '');
+      setPresBio(presidencia.biography || '');
+      initializedPres.current = true;
+    }
+  }, [presidencia]);
+
   // Admin: Fetch pending users
   useEffect(() => {
     if (user?.role === 'admin') {
@@ -286,13 +295,6 @@ export default function App() {
       return () => clearInterval(interval);
     }
   }, [user]);
-
-  useEffect(() => {
-    if (presidencia) {
-      setPresName(presidencia.name);
-      setPresBio(presidencia.biography);
-    }
-  }, [presidencia]);
 
   useEffect(() => {
     const link = document.querySelector("link[rel~='icon']") as HTMLLinkElement;
@@ -2943,38 +2945,41 @@ export default function App() {
 
                           <form onSubmit={handleUpdatePresidencia} className="space-y-6">
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                              <div className="space-y-4">
-                                <div>
-                                  <label className="block text-[10px] font-bold text-secondary uppercase tracking-widest mb-1.5 ml-1">Nome do Presidente</label>
-                                  <input 
-                                    type="text" 
-                                    value={presName}
-                                    onChange={(e) => setPresName(e.target.value)}
-                                    className="w-full bg-surface-container-low border-none rounded-2xl px-4 py-3 text-sm focus:ring-2 focus:ring-primary transition-all"
-                                    required
-                                  />
-                                </div>
-                                <div>
-                                  <label className="block text-[10px] font-bold text-secondary uppercase tracking-widest mb-1.5 ml-1">Foto do Presidente</label>
-                                  <input 
-                                    type="file" 
-                                    accept="image/*"
-                                    onChange={(e) => setPresPhoto(e.target.files?.[0] || null)}
-                                    className="w-full bg-surface-container-low border-none rounded-2xl px-4 py-3 text-sm focus:ring-2 focus:ring-primary transition-all"
-                                  />
-                                </div>
-                              </div>
                               <div>
-                                <label className="block text-[10px] font-bold text-secondary uppercase tracking-widest mb-1.5 ml-1">Biografia</label>
-                                <textarea 
-                                  value={presBio}
-                                  onChange={(e) => setPresBio(e.target.value)}
-                                  rows={6}
-                                  className="w-full bg-surface-container-low border-none rounded-2xl px-4 py-3 text-sm focus:ring-2 focus:ring-primary transition-all resize-none"
+                                <label className="block text-[10px] font-bold text-secondary uppercase tracking-widest mb-1.5 ml-1">Nome do Presidente</label>
+                                <input 
+                                  type="text" 
+                                  value={presName}
+                                  onChange={(e) => setPresName(e.target.value)}
+                                  className="w-full bg-surface-container-low border-none rounded-2xl px-4 py-3 text-sm focus:ring-2 focus:ring-primary transition-all"
                                   required
                                 />
                               </div>
+                              <div>
+                                <label className="block text-[10px] font-bold text-secondary uppercase tracking-widest mb-1.5 ml-1">Foto do Presidente</label>
+                                <input 
+                                  type="file" 
+                                  accept="image/*"
+                                  onChange={(e) => setPresPhoto(e.target.files?.[0] || null)}
+                                  className="w-full bg-surface-container-low border-none rounded-2xl px-4 py-3 text-sm focus:ring-2 focus:ring-primary transition-all"
+                                />
+                              </div>
                             </div>
+                            
+                            <div>
+                              <label className="block text-[10px] font-bold text-secondary uppercase tracking-widest mb-1.5 ml-1">Biografia</label>
+                              <div className="bg-surface-container-low rounded-2xl overflow-hidden border-none">
+                                <ReactQuill 
+                                  theme="snow"
+                                  value={presBio}
+                                  onChange={setPresBio}
+                                  modules={quillModules}
+                                  placeholder="Escreva a biografia do presidente..."
+                                  className="news-editor"
+                                />
+                              </div>
+                            </div>
+
                             <button 
                               type="submit"
                               disabled={isUpdatingPresidencia}
