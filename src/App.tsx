@@ -679,20 +679,20 @@ export default function App() {
 
   const transparenciaItems = [
     { 
+      label: 'ACORDO DE COOPERAÇÃO TÉCNICA', 
+      icon: Handshake,
+      subItems: [
+        { label: '2026', icon: Calendar },
+        { label: '2025', icon: Calendar },
+        { label: '2024', icon: Calendar },
+        { label: '2023', icon: Calendar },
+        { label: '2022', icon: Calendar }
+      ]
+    },
+    { 
       label: 'FINANCEIRA', 
       icon: CircleDollarSign,
       subItems: [
-        { 
-          label: 'ACORDO DE COOPERAÇÃO TÉCNICA', 
-          icon: Handshake,
-          subItems: [
-            { label: '2026', icon: Calendar },
-            { label: '2025', icon: Calendar },
-            { label: '2024', icon: Calendar },
-            { label: '2023', icon: Calendar },
-            { label: '2022', icon: Calendar }
-          ]
-        },
         { 
           label: 'BALANÇO FINANCEIRO', 
           icon: FileText,
@@ -1116,6 +1116,12 @@ export default function App() {
                         <button 
                           onClick={() => {
                             if (item.subItems) {
+                              if (item.subItems.some(i => i.label === '2022')) {
+                                setSelectedFolder({ label: item.label, items: item.subItems });
+                                setCurrentPage('folder');
+                                setIsSidebarOpen(false);
+                                return;
+                              }
                               const isOpening = openLevel2Menu !== item.label;
                               setOpenLevel2Menu(isOpening ? item.label : null);
                               if (!isOpening) {
@@ -1130,7 +1136,7 @@ export default function App() {
                             <item.icon className="w-4 h-4 opacity-60" />
                             {item.label}
                           </div>
-                          {item.subItems && (
+                          {item.subItems && !item.subItems.some(i => i.label === '2022') && (
                             <ChevronRight className={`w-4 h-4 transition-transform ${openLevel2Menu === item.label ? 'rotate-90' : ''}`} />
                           )}
                         </button>
