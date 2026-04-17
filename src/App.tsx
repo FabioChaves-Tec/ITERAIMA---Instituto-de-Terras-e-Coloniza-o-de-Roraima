@@ -91,7 +91,8 @@ const transparencyCategories = [
   'FUNDIÁRIA',
   'MODELOS DE REQUERIMENTOS',
   'LEI VIGENTE',
-  'LEI NÃO VIGENTE'
+  'LEI NÃO VIGENTE',
+  'ACORDO DE COOPERAÇÃO TÉCNICA'
 ];
 
 const MONTHS = [
@@ -681,6 +682,17 @@ export default function App() {
       label: 'FINANCEIRA', 
       icon: CircleDollarSign,
       subItems: [
+        { 
+          label: 'ACORDO DE COOPERAÇÃO TÉCNICA', 
+          icon: Handshake,
+          subItems: [
+            { label: '2026', icon: Calendar },
+            { label: '2025', icon: Calendar },
+            { label: '2024', icon: Calendar },
+            { label: '2023', icon: Calendar },
+            { label: '2022', icon: Calendar }
+          ]
+        },
         { 
           label: 'BALANÇO FINANCEIRO', 
           icon: FileText,
