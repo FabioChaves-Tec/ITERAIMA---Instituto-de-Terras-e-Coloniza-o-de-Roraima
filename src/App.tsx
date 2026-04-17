@@ -1527,6 +1527,13 @@ export default function App() {
                             <button 
                               onClick={() => {
                                 if (sub.subItems) {
+                                  if (sub.subItems.some(i => i.label === '2022')) {
+                                    setSelectedFolder({ label: sub.label, items: sub.subItems });
+                                    setCurrentPage('folder');
+                                    setShowTransparenciaSub(false);
+                                    scrollToTop();
+                                    return;
+                                  }
                                   const isOpening = openLevel2Menu !== sub.label;
                                   setOpenLevel2Menu(isOpening ? sub.label : null);
                                   if (!isOpening) {
@@ -1543,7 +1550,7 @@ export default function App() {
                                 </div>
                                 {sub.label}
                               </div>
-                              {sub.subItems && (
+                              {sub.subItems && !sub.subItems.some(i => i.label === '2022') && (
                                 <ChevronRight className={`w-4 h-4 transition-transform ${openLevel2Menu === sub.label ? 'rotate-90' : ''}`} />
                               )}
                             </button>
