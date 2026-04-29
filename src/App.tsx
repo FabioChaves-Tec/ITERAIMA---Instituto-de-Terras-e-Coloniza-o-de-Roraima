@@ -2149,8 +2149,8 @@ export default function App() {
                           <div className="w-10 h-10 bg-primary/5 rounded-xl flex items-center justify-center text-primary">
                             <File className="w-5 h-5" />
                           </div>
-                          <div>
-                            <span className="block text-sm font-bold text-primary truncate max-w-[200px]">{doc.name}</span>
+                          <div className="flex-1 min-w-0">
+                            <span className="block text-sm font-bold text-primary break-words">{doc.name}</span>
                             <span className="text-[10px] text-secondary font-medium uppercase tracking-wider">
                               PDF • {new Date(doc.upload_date).toLocaleDateString('pt-BR')}
                             </span>
