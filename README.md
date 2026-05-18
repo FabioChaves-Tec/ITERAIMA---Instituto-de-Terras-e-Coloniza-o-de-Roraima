@@ -1,11 +1,35 @@
-<div align="center">
+# ITERAIMA - Portal Institucional e da Transparência
 
-<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
+Este é o portal oficial do **Instituto de Terras e Colonização de Roraima (ITERAIMA)**, desenvolvido para fornecer informações sobre regularização fundiária, notícias institucionais, transparência pública e atendimento via Inteligência Artificial.
 
-  <h1>Built with AI Studio</h2>
+## 🚀 Como Iniciar
 
-  <p>The fastest path from prompt to production with Gemini.</p>
+Para rodar o projeto localmente ou em produção, consulte a documentação detalhada:
 
-  <a href="https://aistudio.google.com/apps">Start building</a>
+👉 **[DOCUMENTATION.md](./DOCUMENTATION.md)**
 
-</div>
+## 🛠️ Tecnologias Utilizadas
+
+- **Frontend:** React, Vite, Tailwind CSS, Lucide Icons, Framer Motion.
+- **Backend:** Node.js, Express, Multer (Uploads), JWT (Auth).
+- **Banco de Dados:** PostgreSQL.
+- **IA:** OpenAI (GPT-4o).
+
+## 📁 Estrutura Principal
+
+- `/src/App.tsx`: Interface principal do portal.
+- `/server.ts`: Servidor de API e Banco de Dados (agora com suporte nativo a OpenAI).
+- `/src/services/aiService.ts`: Integração com a IA através do backend.
+- `/uploads/`: Armazenamento de documentos e imagens.
+
+## 🔑 Configuração Necessária
+
+Para o funcionamento total do portal, adicione as seguintes chaves nas configurações de **Secrets** do AI Studio:
+- `OPENAI_API_KEY`: Para o Assistente Virtual.
+- `JWT_SECRET`: Chave secreta para autenticação.
+- `GEMINI_API_KEY`: (Opcional) Para funcionalidades que ainda usem Gemini.
+
+## 📞 Contato
+
+- **Email:** protoiteraima@gmail.com
+- **WhatsApp:** (95) 98408-0403
