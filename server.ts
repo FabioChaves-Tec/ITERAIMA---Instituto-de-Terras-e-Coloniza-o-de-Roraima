@@ -86,9 +86,51 @@ const initDb = async () => {
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
 
+      CREATE TABLE IF NOT EXISTS menus (
+        id SERIAL PRIMARY KEY,
+        label TEXT NOT NULL,
+        path TEXT,
+        parent_id INTEGER REFERENCES menus(id) ON DELETE CASCADE,
+        order_index INTEGER DEFAULT 0,
+        icon TEXT,
+        is_external BOOLEAN DEFAULT FALSE,
+        type TEXT DEFAULT 'link'
+      );
+
       INSERT INTO settings (key, value) VALUES ('cover_photo', '/uploads/default-cover.jpg') ON CONFLICT DO NOTHING;
       INSERT INTO settings (key, value) VALUES ('logo_url', 'https://iteraimacidadao.rr.gov.br/cadastrousuarioexterno/include/images/marca/logo_iteraima.png') ON CONFLICT DO NOTHING;
       INSERT INTO settings (key, value) VALUES ('favicon_url', 'https://iteraimacidadao.rr.gov.br/cadastrousuarioexterno/include/images/marca/logo_iteraima.png') ON CONFLICT DO NOTHING;
+      
+      -- Seed Menus if empty
+      DO $$
+      DECLARE
+        inst_id INTEGER;
+        transp_id INTEGER;
+        legis_id INTEGER;
+      BEGIN
+        IF NOT EXISTS (SELECT 1 FROM menus) THEN
+          -- Institutional
+          INSERT INTO menus (label, type, order_index, icon) VALUES ('INSTITUCIONAL', 'folder', 0, 'Landmark') RETURNING id INTO inst_id;
+          INSERT INTO menus (label, path, parent_id, order_index) VALUES ('PRESIDÊNCIA', 'presidencia', inst_id, 0);
+          INSERT INTO menus (label, path, parent_id, order_index) VALUES ('DIRETORIAS', 'diretorias', inst_id, 1);
+          INSERT INTO menus (label, path, parent_id, order_index) VALUES ('GALERIA DE PRESIDENTES', 'galeria', inst_id, 2);
+
+          -- Transparency
+          INSERT INTO menus (label, type, order_index, icon) VALUES ('TRANSPARÊNCIA', 'folder', 1, 'Search') RETURNING id INTO transp_id;
+          INSERT INTO menus (label, path, parent_id, order_index, type) VALUES ('BALANÇO FINANCEIRO', 'folder', transp_id, 0, 'category');
+          INSERT INTO menus (label, path, parent_id, order_index, type) VALUES ('CONTRATAÇÃO DIRETA', 'folder', transp_id, 1, 'category');
+          INSERT INTO menus (label, path, parent_id, order_index, type) VALUES ('CONTRATOS E ADITIVOS', 'folder', transp_id, 2, 'category');
+          INSERT INTO menus (label, path, parent_id, order_index, type) VALUES ('EDITAIS', 'folder', transp_id, 3, 'category');
+
+          -- Legislation
+          INSERT INTO menus (label, type, order_index, icon) VALUES ('LEGISLAÇÃO', 'folder', 2, 'Gavel') RETURNING id INTO legis_id;
+          INSERT INTO menus (label, path, parent_id, order_index, type) VALUES ('LEI VIGENTE', 'folder', legis_id, 0, 'category');
+          INSERT INTO menus (label, path, parent_id, order_index, type) VALUES ('LEI NÃO VIGENTE', 'folder', legis_id, 1, 'category');
+          
+          -- Home Link
+          INSERT INTO menus (label, path, order_index, icon) VALUES ('INÍCIO', 'home', -1, 'Home');
+        END IF;
+      END $$;
       
       -- Initialize presidencia if empty
       INSERT INTO presidencia (id, name, photo_url, biography) 
@@ -405,6 +447,54 @@ async function startServer() {
       res.json({ message: "Presidente removido da galeria" });
     } catch (err) {
       res.status(500).json({ message: "Erro ao remover da galeria" });
+    }
+  });
+
+  // Menus API
+  app.get("/api/menus", async (req, res) => {
+    try {
+      const { rows } = await pool.query("SELECT * FROM menus ORDER BY order_index ASC, id ASC");
+      res.json(rows);
+    } catch (err) {
+      res.status(500).json({ message: "Erro ao buscar menus" });
+    }
+  });
+
+  app.post("/api/menus", authenticateToken, async (req: any, res) => {
+    if (req.user.role !== 'admin' && req.user.role !== 'editor') return res.sendStatus(403);
+    const { label, path, parent_id, order_index, icon, is_external, type } = req.body;
+    try {
+      const { rows } = await pool.query(
+        "INSERT INTO menus (label, path, parent_id, order_index, icon, is_external, type) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *",
+        [label, path, parent_id, order_index, icon, is_external, type]
+      );
+      res.json(rows[0]);
+    } catch (err) {
+      res.status(500).json({ message: "Erro ao criar menu" });
+    }
+  });
+
+  app.put("/api/menus/:id", authenticateToken, async (req: any, res) => {
+    if (req.user.role !== 'admin' && req.user.role !== 'editor') return res.sendStatus(403);
+    const { label, path, parent_id, order_index, icon, is_external, type } = req.body;
+    try {
+      const { rows } = await pool.query(
+        "UPDATE menus SET label = $1, path = $2, parent_id = $3, order_index = $4, icon = $5, is_external = $6, type = $7 WHERE id = $8 RETURNING *",
+        [label, path, parent_id, order_index, icon, is_external, type, req.params.id]
+      );
+      res.json(rows[0]);
+    } catch (err) {
+      res.status(500).json({ message: "Erro ao atualizar menu" });
+    }
+  });
+
+  app.delete("/api/menus/:id", authenticateToken, async (req: any, res) => {
+    if (req.user.role !== 'admin' && req.user.role !== 'editor') return res.sendStatus(403);
+    try {
+      await pool.query("DELETE FROM menus WHERE id = $1", [req.params.id]);
+      res.json({ message: "Menu removido com sucesso" });
+    } catch (err) {
+      res.status(500).json({ message: "Erro ao remover menu" });
     }
   });
 
