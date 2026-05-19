@@ -91,6 +91,154 @@ const stripHtml = (html: string) => {
   return doc.body.textContent || "";
 };
 
+const SidebarMenuItem = ({ 
+  item, 
+  level = 1, 
+  currentPage, 
+  setCurrentPage, 
+  setSelectedFolder, 
+  setIsSidebarOpen, 
+  getIcon 
+}: any) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const Icon = getIcon(item.icon);
+  const hasSubItems = item.subItems && item.subItems.length > 0;
+  
+  const handleClick = () => {
+    if (hasSubItems) {
+      setIsOpen(!isOpen);
+    } else if (item.type === 'link' && item.path) {
+      if (item.path.startsWith('http')) {
+        window.open(item.path, '_blank');
+      } else {
+        setCurrentPage(item.path as any);
+      }
+      setIsSidebarOpen(false);
+    } else if (item.type === 'category' || item.type === 'folder') {
+      setSelectedFolder({ 
+        label: item.label, 
+        items: item.subItems.length > 0 ? item.subItems.map((s: any) => ({...s, icon: getIcon(s.icon)})) : [
+          { label: '2026', icon: Calendar },
+          { label: '2025', icon: Calendar },
+          { label: '2024', icon: Calendar },
+          { label: '2023', icon: Calendar },
+          { label: '2022', icon: Calendar }
+        ]
+      });
+      setCurrentPage('folder');
+      setIsSidebarOpen(false);
+    }
+  };
+
+  return (
+    <div className="w-full">
+      <div 
+        onClick={handleClick}
+        className={`flex items-center justify-between gap-3 font-bold w-full p-2 rounded-xl transition-colors cursor-pointer group ${
+          level === 1 ? 'text-sm' : 'text-xs'
+        } ${currentPage === item.path ? 'bg-primary text-white shadow-md' : 'text-secondary hover:bg-primary/5'}`}
+      >
+        <div className="flex items-center gap-3 min-w-0">
+          <Icon className={`${level === 1 ? 'w-5 h-5' : 'w-4 h-4'} flex-shrink-0 ${currentPage === item.path ? 'opacity-100' : 'opacity-60 group-hover:opacity-100'}`} />
+          <span className="truncate uppercase tracking-tight">{item.label}</span>
+        </div>
+        {hasSubItems && (
+          <ChevronRight className={`w-4 h-4 transition-transform flex-shrink-0 ${isOpen ? 'rotate-90' : ''} ${currentPage === item.path ? 'opacity-100' : 'opacity-40 group-hover:opacity-100'}`} />
+        )}
+      </div>
+
+      {hasSubItems && (
+        <AnimatePresence>
+          {isOpen && (
+            <motion.div 
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: 'auto', opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              className="overflow-hidden grid gap-1 pl-4 border-l-2 border-primary/10 ml-4 mt-1"
+            >
+              {item.subItems.map((sub: any) => (
+                <SidebarMenuItem 
+                  key={sub.id} 
+                  item={sub} 
+                  level={level + 1}
+                  currentPage={currentPage}
+                  setCurrentPage={setCurrentPage}
+                  setSelectedFolder={setSelectedFolder}
+                  setIsSidebarOpen={setIsSidebarOpen}
+                  getIcon={getIcon}
+                />
+              ))}
+            </motion.div>
+          )}
+        </AnimatePresence>
+      )}
+    </div>
+  );
+};
+
+const AdminMenuListItem = ({ 
+  item, 
+  allMenus, 
+  onEdit, 
+  onDelete, 
+  getIcon, 
+  level = 0 
+}: any) => {
+  const children = allMenus.filter((m: any) => m.parent_id === item.id).sort((a: any, b: any) => a.order_index - b.order_index);
+  
+  return (
+    <div className={`space-y-1 ${level > 0 ? 'ml-6' : ''}`}>
+      <div className="flex items-center gap-4 p-3 bg-white hover:bg-surface-container-low rounded-2xl border border-primary/5 hover:border-primary/20 transition-all group shadow-sm">
+         <div className="w-8 h-8 rounded-xl bg-primary/5 flex items-center justify-center text-primary group-hover:bg-primary group-hover:text-white transition-all">
+            {React.createElement(getIcon(item.icon), { className: 'w-4 h-4' })}
+         </div>
+         <div className="flex-1 min-w-0">
+            <h4 className="font-black text-primary text-[11px] uppercase truncate tracking-tight">{item.label}</h4>
+            <p className="text-[8px] text-secondary font-bold truncate uppercase tracking-widest">{item.type} • {item.path || 'Agrupador'}</p>
+         </div>
+         <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-all">
+            <button 
+              onClick={() => onEdit(item)}
+              title="Editar"
+              className="p-1.5 text-primary hover:bg-primary/10 rounded-lg transition-colors"
+            >
+               <Edit2 className="w-4 h-4" />
+            </button>
+            <button 
+              onClick={() => onEdit({ label: '', path: '', type: 'link', parent_id: item.id, order_index: 0, is_external: false, icon: 'File' })}
+              title="Novo Submenu"
+              className="p-1.5 text-primary hover:bg-primary/10 rounded-lg transition-colors"
+            >
+               <Plus className="w-4 h-4" />
+            </button>
+            <button 
+              onClick={() => onDelete(item.id)}
+              title="Excluir"
+              className="p-1.5 text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+            >
+               <Trash2 className="w-4 h-4" />
+            </button>
+         </div>
+      </div>
+      {children.length > 0 && (
+        <div className="border-l-2 border-primary/5 ml-4 pb-2">
+          {children.map((child: any) => (
+            <AdminMenuListItem 
+              key={child.id} 
+              item={child} 
+              allMenus={allMenus} 
+              onEdit={onEdit} 
+              onDelete={onDelete} 
+              getIcon={getIcon} 
+              level={level + 1} 
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
+
 const STATIC_CATEGORIES = [
   'BALANÇO FINANCEIRO', 'CONTRATAÇÃO DIRETA', 'CONTRATOS E ADITIVOS', 'AVISO', 'COMUNICADO', 'DISPENSA', 'EDITAIS', 
   'INEXIGIBILIDADE', 'RESULTADO', 'SÍNTESE', 'ATA DE REGISTRO DE PREÇOS', 'PLANO DE CONTRATAÇÃO ANUAL – PCA', 
@@ -736,39 +884,56 @@ export default function App() {
 
   const transparenciaItems = React.useMemo(() => {
     const transp = menuTree.find(m => m.label === 'TRANSPARÊNCIA');
-    const items = transp ? transp.subItems.map((s: any) => ({ 
-      ...s, 
-      icon: getIcon(s.icon),
-      subItems: s.subItems.length > 0 ? s.subItems.map((ss: any) => ({ ...ss, icon: getIcon(ss.icon) })) : [
-        { label: '2026', icon: Calendar },
-        { label: '2025', icon: Calendar },
-        { label: '2024', icon: Calendar },
-        { label: '2023', icon: Calendar },
-        { label: '2022', icon: Calendar }
-      ]
-    })) : [];
-    return items;
+    if (!transp) return [];
+
+    const mapSubItems = (items: any[]): any[] => {
+      return items.map(s => ({
+        ...s,
+        icon: getIcon(s.icon),
+        subItems: s.subItems.length > 0 ? mapSubItems(s.subItems) : [
+          { label: '2026', icon: Calendar },
+          { label: '2025', icon: Calendar },
+          { label: '2024', icon: Calendar },
+          { label: '2023', icon: Calendar },
+          { label: '2022', icon: Calendar }
+        ]
+      }));
+    };
+    return mapSubItems(transp.subItems);
   }, [menuTree]);
 
   const legislacaoItems = React.useMemo(() => {
     const legis = menuTree.find(m => m.label === 'LEGISLAÇÃO');
-    const items = legis ? legis.subItems.map((s: any) => ({ 
-      ...s, 
-      icon: getIcon(s.icon),
-      subItems: s.subItems.length > 0 ? s.subItems.map((ss: any) => ({ ...ss, icon: getIcon(ss.icon) })) : [
-        { label: '2026', icon: Calendar },
-        { label: '2025', icon: Calendar },
-        { label: '2024', icon: Calendar },
-        { label: '2023', icon: Calendar },
-        { label: '2022', icon: Calendar }
-      ]
-    })) : [];
-    return items;
+    if (!legis) return [];
+
+    const mapSubItems = (items: any[]): any[] => {
+      return items.map(s => ({
+        ...s,
+        icon: getIcon(s.icon),
+        subItems: s.subItems.length > 0 ? mapSubItems(s.subItems) : [
+          { label: '2026', icon: Calendar },
+          { label: '2025', icon: Calendar },
+          { label: '2024', icon: Calendar },
+          { label: '2023', icon: Calendar },
+          { label: '2022', icon: Calendar }
+        ]
+      }));
+    };
+    return mapSubItems(legis.subItems);
   }, [menuTree]);
 
   const customMenuItems = React.useMemo(() => {
     const reserved = ['INSTITUCIONAL', 'TRANSPARÊNCIA', 'LEGISLAÇÃO', 'NOTÍCIAS', 'INÍCIO'];
-    return menuTree.filter(m => !reserved.includes(m.label));
+    const topLevelCustom = menuTree.filter(m => !reserved.includes(m.label));
+    
+    // Add subfolders from Transparency and Legislation to the home grid
+    const transp = menuTree.find(m => m.label === 'TRANSPARÊNCIA');
+    const legis = menuTree.find(m => m.label === 'LEGISLAÇÃO');
+    
+    const transpSubs = transp ? transp.subItems.filter((s: any) => s.type === 'folder' || s.type === 'category') : [];
+    const legisSubs = legis ? legis.subItems.filter((s: any) => s.type === 'folder' || s.type === 'category') : [];
+
+    return [...topLevelCustom, ...transpSubs, ...legisSubs];
   }, [menuTree]);
 
   return (
@@ -803,119 +968,43 @@ export default function App() {
                 </button>
               </div>
 
-              <div className="space-y-6 overflow-y-auto flex-1">
-                {menuTree.map((menu) => {
-                  const Icon = getIcon(menu.icon);
-                  const hasSubItems = menu.subItems && menu.subItems.length > 0;
-                  const isOpening = openLevel2Menu === menu.label;
+              <div className="space-y-4 overflow-y-auto flex-1 pr-2 custom-scrollbar">
+                {menuTree.map((menu) => (
+                  <SidebarMenuItem 
+                    key={menu.id} 
+                    item={menu} 
+                    currentPage={currentPage}
+                    setCurrentPage={setCurrentPage}
+                    setSelectedFolder={setSelectedFolder}
+                    setIsSidebarOpen={setIsSidebarOpen}
+                    getIcon={getIcon}
+                  />
+                ))}
 
-                  return (
-                    <div key={menu.id}>
-                      <div 
-                        onClick={() => {
-                          if (hasSubItems) {
-                            setOpenLevel2Menu(isOpening ? null : menu.label);
-                          } else if (menu.type === 'link' && menu.path) {
-                            if (menu.path.startsWith('http')) {
-                              window.open(menu.path, '_blank');
-                            } else {
-                              setCurrentPage(menu.path as any);
-                            }
-                            setIsSidebarOpen(false);
-                          } else if (menu.type === 'category' || menu.type === 'folder') {
-                            setSelectedFolder({ label: menu.label, items: menu.subItems.length > 0 ? menu.subItems.map(s => ({...s, icon: getIcon(s.icon)})) : [
-                              { label: '2026', icon: Calendar },
-                              { label: '2025', icon: Calendar },
-                              { label: '2024', icon: Calendar },
-                              { label: '2023', icon: Calendar },
-                              { label: '2022', icon: Calendar }
-                            ]});
-                            setCurrentPage('folder');
-                            setIsSidebarOpen(false);
-                          }
-                        }}
-                        className={`flex items-center justify-between gap-3 font-bold text-sm w-full p-2 rounded-xl transition-colors cursor-pointer ${currentPage === menu.path ? 'bg-primary text-white' : 'text-secondary hover:bg-primary/5'}`}
-                      >
-                        <div className="flex items-center gap-3">
-                          <Icon className="w-5 h-5" />
-                          {menu.label}
-                        </div>
-                        {hasSubItems && <ChevronRight className={`w-4 h-4 transition-transform ${isOpening ? 'rotate-90' : ''}`} />}
-                      </div>
-
-                      {hasSubItems && (
-                        <AnimatePresence>
-                          {isOpening && (
-                            <motion.div 
-                              initial={{ height: 0, opacity: 0 }}
-                              animate={{ height: 'auto', opacity: 1 }}
-                              exit={{ height: 0, opacity: 0 }}
-                              className="overflow-hidden grid gap-2 pl-4 border-l-2 border-primary/10 ml-4 mt-2"
-                            >
-                              {menu.subItems.map((sub: any) => {
-                                const SubIcon = getIcon(sub.icon);
-                                return (
-                                  <button 
-                                    key={sub.label}
-                                    onClick={() => {
-                                      if (sub.type === 'category' || sub.type === 'folder' || (sub.subItems && sub.subItems.length > 0)) {
-                                         setSelectedFolder({ 
-                                           label: sub.label, 
-                                           items: sub.subItems.length > 0 ? sub.subItems.map((ss: any) => ({...ss, icon: getIcon(ss.icon)})) : [
-                                            { label: '2026', icon: Calendar },
-                                            { label: '2025', icon: Calendar },
-                                            { label: '2024', icon: Calendar },
-                                            { label: '2023', icon: Calendar },
-                                            { label: '2022', icon: Calendar }
-                                          ]
-                                         });
-                                         setCurrentPage('folder');
-                                      } else if (sub.path) {
-                                        if (sub.path.startsWith('http')) {
-                                          window.open(sub.path, '_blank');
-                                        } else {
-                                          setCurrentPage(sub.path as any);
-                                        }
-                                      }
-                                      setIsSidebarOpen(false);
-                                    }}
-                                    className="flex items-center gap-3 p-3 rounded-xl hover:bg-primary/5 text-primary text-xs font-bold transition-colors text-left"
-                                  >
-                                    <SubIcon className="w-4 h-4 opacity-60" />
-                                    {sub.label}
-                                  </button>
-                                );
-                              })}
-                            </motion.div>
-                          )}
-                        </AnimatePresence>
-                      )}
-                    </div>
-                  );
-                })}
-
-                <a 
-                  href="https://iteraimacidadao.rr.gov.br/"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center gap-3 text-secondary font-bold text-sm w-full p-2 rounded-xl hover:bg-primary/5 transition-colors"
-                >
-                  <Wallet className="w-5 h-5" />
-                  ITERAIMA CIDADÃO
-                </a>
-
-                {user && (
-                  <button 
-                    onClick={() => {
-                      setCurrentPage('admin');
-                      setIsSidebarOpen(false);
-                    }}
-                    className={`flex items-center gap-3 font-bold text-sm w-full p-2 rounded-xl transition-colors ${currentPage === 'admin' ? 'bg-primary text-white' : 'text-secondary hover:bg-primary/5'}`}
+                <div className="pt-4 space-y-4">
+                  <a 
+                    href="https://iteraimacidadao.rr.gov.br/"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-3 text-secondary font-bold text-sm w-full p-2 rounded-xl hover:bg-primary/5 transition-colors"
                   >
-                    <Plus className="w-5 h-5" />
-                    PAINEL ADMIN
-                  </button>
-                )}
+                    <Wallet className="w-5 h-5 flex-shrink-0" />
+                    ITERAIMA CIDADÃO
+                  </a>
+
+                  {user && (
+                    <button 
+                      onClick={() => {
+                        setCurrentPage('admin');
+                        setIsSidebarOpen(false);
+                      }}
+                      className={`flex items-center gap-3 font-bold text-sm w-full p-2 rounded-xl transition-colors ${currentPage === 'admin' ? 'bg-primary text-white' : 'text-secondary hover:bg-primary/5'}`}
+                    >
+                      <Plus className="w-5 h-5 flex-shrink-0" />
+                      PAINEL ADMIN
+                    </button>
+                  )}
+                </div>
               </div>
 
                 <div className="mt-auto pt-6 border-t border-primary/10">
@@ -2963,74 +3052,16 @@ export default function App() {
                             </button>
                           </div>
 
-                          <div className="space-y-4">
+                          <div className="space-y-4 max-h-[60vh] overflow-y-auto pr-2 custom-scrollbar">
                             {menus.filter(m => !m.parent_id).sort((a, b) => a.order_index - b.order_index).map(parent => (
-                              <div key={parent.id} className="space-y-2">
-                                <div className="flex items-center gap-4 p-4 bg-surface-container-low rounded-2xl border border-primary/5 hover:border-primary/20 transition-all group">
-                                  <div className="w-10 h-10 rounded-xl bg-white flex items-center justify-center text-primary">
-                                    {React.createElement(getIcon(parent.icon), { className: 'w-5 h-5' })}
-                                  </div>
-                                  <div className="flex-1">
-                                    <h4 className="font-black text-primary text-sm uppercase tracking-tight">{parent.label}</h4>
-                                    <p className="text-[10px] text-secondary font-bold uppercase tracking-tighter opacity-60">
-                                      {parent.type.toUpperCase()} {parent.path ? `| ${parent.path}` : ''}
-                                    </p>
-                                  </div>
-                                  <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-all">
-                                    <button 
-                                      onClick={() => setEditingMenu(parent)}
-                                      className="p-2 text-primary hover:bg-primary/10 rounded-lg transition-colors"
-                                      title="Editar"
-                                    >
-                                      <Settings className="w-4 h-4" />
-                                    </button>
-                                    <button 
-                                      onClick={() => handleDeleteMenu(parent.id)}
-                                      className="p-2 text-red-500 hover:bg-red-50 rounded-lg transition-colors"
-                                      title="Excluir"
-                                    >
-                                      <Trash2 className="w-4 h-4" />
-                                    </button>
-                                  </div>
-                                </div>
-
-                                {/* Submenus */}
-                                <div className="pl-12 space-y-2">
-                                  {menus.filter(m => m.parent_id === parent.id).sort((a, b) => a.order_index - b.order_index).map(child => (
-                                    <div key={child.id} className="flex items-center gap-4 p-3 bg-white rounded-xl border border-primary/10 hover:border-primary/30 transition-all group">
-                                      <div className="w-8 h-8 rounded-lg bg-surface-container-low flex items-center justify-center text-primary/70">
-                                        {React.createElement(getIcon(child.icon), { className: 'w-4 h-4' })}
-                                      </div>
-                                      <div className="flex-1">
-                                        <h5 className="font-bold text-primary text-xs uppercase">{child.label}</h5>
-                                        <p className="text-[9px] text-secondary font-medium uppercase tracking-tighter">
-                                          {child.type} {child.path ? `| ${child.path}` : ''}
-                                        </p>
-                                      </div>
-                                      <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-all">
-                                        <button 
-                                          onClick={() => setEditingMenu(child)}
-                                          className="p-1.5 text-primary hover:bg-primary/10 rounded-lg transition-colors"
-                                        >
-                                          <Settings className="w-3.5 h-3.5" />
-                                        </button>
-                                        <button 
-                                          onClick={() => handleDeleteMenu(child.id)}
-                                          className="p-1.5 text-red-500 hover:bg-red-50 rounded-lg transition-colors"
-                                        >
-                                          <Trash2 className="w-3.5 h-3.5" />
-                                        </button>
-                                      </div>
-                                    </div>
-                                  ))}
-                                  <button 
-                                    onClick={() => setEditingMenu({ label: '', path: '', type: 'link', parent_id: parent.id, order_index: 0, is_external: false, icon: 'File' })}
-                                    className="w-full py-2 border-2 border-dashed border-primary/10 rounded-xl text-[10px] font-black text-primary/40 uppercase tracking-widest hover:border-primary/30 hover:text-primary transition-all"
-                                  >
-                                    + Adicionar Submenu em {parent.label}
-                                  </button>
-                                </div>
-                              </div>
+                              <AdminMenuListItem 
+                                key={parent.id} 
+                                item={parent} 
+                                allMenus={menus} 
+                                onEdit={setEditingMenu} 
+                                onDelete={handleDeleteMenu} 
+                                getIcon={getIcon} 
+                              />
                             ))}
                           </div>
                         </div>
@@ -3139,7 +3170,7 @@ export default function App() {
                                           className="w-full bg-white border-none rounded-2xl px-5 py-4 text-sm font-bold text-primary focus:ring-4 focus:ring-primary/10 transition-all shadow-sm"
                                         >
                                           <option value="">Nenhum (Top Level)</option>
-                                          {menus.filter(m => !m.parent_id && m.id !== editingMenu.id).map(m => (
+                                          {menus.filter(m => m.id !== editingMenu.id).map(m => (
                                             <option key={m.id} value={m.id}>{m.label}</option>
                                           ))}
                                         </select>

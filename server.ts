@@ -107,8 +107,20 @@ const initDb = async () => {
         inst_id INTEGER;
         transp_id INTEGER;
         legis_id INTEGER;
+        
+        -- Transparency Sub-ids
+        financeira_id INTEGER;
+        coslic_id INTEGER;
+        fundiaria_id INTEGER;
+        pessoas_id INTEGER;
+        
+        -- Legislation Sub-ids
+        legis_fundiaria_id INTEGER;
       BEGIN
         IF NOT EXISTS (SELECT 1 FROM menus) THEN
+          -- Home Link
+          INSERT INTO menus (label, path, order_index, icon) VALUES ('INÍCIO', 'home', -1, 'Home');
+
           -- Institutional
           INSERT INTO menus (label, type, order_index, icon) VALUES ('INSTITUCIONAL', 'folder', 0, 'Landmark') RETURNING id INTO inst_id;
           INSERT INTO menus (label, path, parent_id, order_index) VALUES ('PRESIDÊNCIA', 'presidencia', inst_id, 0);
@@ -117,18 +129,46 @@ const initDb = async () => {
 
           -- Transparency
           INSERT INTO menus (label, type, order_index, icon) VALUES ('TRANSPARÊNCIA', 'folder', 1, 'Search') RETURNING id INTO transp_id;
-          INSERT INTO menus (label, path, parent_id, order_index, type) VALUES ('BALANÇO FINANCEIRO', 'folder', transp_id, 0, 'category');
-          INSERT INTO menus (label, path, parent_id, order_index, type) VALUES ('CONTRATAÇÃO DIRETA', 'folder', transp_id, 1, 'category');
-          INSERT INTO menus (label, path, parent_id, order_index, type) VALUES ('CONTRATOS E ADITIVOS', 'folder', transp_id, 2, 'category');
-          INSERT INTO menus (label, path, parent_id, order_index, type) VALUES ('EDITAIS', 'folder', transp_id, 3, 'category');
+          
+          INSERT INTO menus (label, type, parent_id, order_index, icon) VALUES ('ACORDO DE COOPERAÇÃO TÉCNICA', 'folder', transp_id, 0, 'Handshake') RETURNING id;
+          
+          INSERT INTO menus (label, type, parent_id, order_index, icon) VALUES ('FINANCEIRA', 'folder', transp_id, 1, 'DollarSign') RETURNING id INTO financeira_id;
+          INSERT INTO menus (label, path, parent_id, order_index, type) VALUES ('BALANÇO FINANCEIRO', 'folder', financeira_id, 0, 'category');
+          INSERT INTO menus (label, path, parent_id, order_index, type) VALUES ('CONTRATAÇÃO DIRETA', 'folder', financeira_id, 1, 'category');
+          INSERT INTO menus (label, path, parent_id, order_index, type) VALUES ('CONTRATOS E ADITIVOS', 'folder', financeira_id, 2, 'category');
+          INSERT INTO menus (label, type, parent_id, order_index, icon) VALUES ('COSLIC', 'folder', financeira_id, 3, 'FileText') RETURNING id INTO coslic_id;
+            INSERT INTO menus (label, path, parent_id, order_index, type) VALUES ('AVISO', 'folder', coslic_id, 0, 'category');
+            INSERT INTO menus (label, path, parent_id, order_index, type) VALUES ('COMUNICADO', 'folder', coslic_id, 1, 'category');
+            INSERT INTO menus (label, path, parent_id, order_index, type) VALUES ('DISPENSA', 'folder', coslic_id, 2, 'category');
+            INSERT INTO menus (label, path, parent_id, order_index, type) VALUES ('EDITAIS', 'folder', coslic_id, 3, 'category');
+            INSERT INTO menus (label, path, parent_id, order_index, type) VALUES ('INEXIGIBILIDADE', 'folder', coslic_id, 4, 'category');
+            INSERT INTO menus (label, path, parent_id, order_index, type) VALUES ('RESULTADO', 'folder', coslic_id, 5, 'category');
+            INSERT INTO menus (label, path, parent_id, order_index, type) VALUES ('SÍNTESE', 'folder', coslic_id, 6, 'category');
+            INSERT INTO menus (label, path, parent_id, order_index, type) VALUES ('ATA DE REGISTRO DE PREÇOS', 'folder', coslic_id, 7, 'category');
+          INSERT INTO menus (label, path, parent_id, order_index, type) VALUES ('PLANO DE CONTRATAÇÃO ANUAL – PCA', 'folder', financeira_id, 4, 'Calendar');
+
+          INSERT INTO menus (label, type, parent_id, order_index, icon) VALUES ('FUNDIÁRIA', 'folder', transp_id, 2, 'Map') RETURNING id INTO fundiaria_id;
+          INSERT INTO menus (label, path, parent_id, order_index, type, icon) VALUES ('IMÓVEIS', 'folder', fundiaria_id, 0, 'category', 'Home');
+          INSERT INTO menus (label, path, parent_id, order_index, type, icon) VALUES ('REGULARIZADOS', 'folder', fundiaria_id, 1, 'category', 'CheckCircle');
+          INSERT INTO menus (label, path, parent_id, order_index, type, icon) VALUES ('NOTIFICAÇÕES', 'folder', fundiaria_id, 2, 'category', 'Bell');
+          INSERT INTO menus (label, path, parent_id, order_index, type, icon) VALUES ('REQUERIMENTO DE REGULARIZAÇÃO', 'folder', fundiaria_id, 3, 'category', 'FileEdit');
+
+          INSERT INTO menus (label, type, parent_id, order_index, icon) VALUES ('DE PESSOAS', 'folder', transp_id, 3, 'Users') RETURNING id INTO pessoas_id;
+          INSERT INTO menus (label, path, parent_id, order_index, type, icon) VALUES ('CONCURSOS E SELEÇÕES', 'folder', pessoas_id, 0, 'category', 'UserPlus');
+          INSERT INTO menus (label, path, parent_id, order_index, type, icon) VALUES ('DIRETORIA DE PESSOAS', 'folder', pessoas_id, 1, 'category', 'Briefcase');
+          INSERT INTO menus (label, path, parent_id, order_index, type, icon) VALUES ('DIÁRIAS', 'folder', pessoas_id, 2, 'category', 'DollarSign');
+          INSERT INTO menus (label, path, parent_id, order_index, type, icon) VALUES ('ESTAGIÁRIOS', 'folder', pessoas_id, 3, 'category', 'User');
+          INSERT INTO menus (label, path, parent_id, order_index, type, icon) VALUES ('FOLHA DE PAYAMENTO', 'folder', pessoas_id, 4, 'category', 'FileText');
+          INSERT INTO menus (label, path, parent_id, order_index, type, icon) VALUES ('TERCEIRIZADOS', 'folder', pessoas_id, 5, 'category', 'Users');
 
           -- Legislation
           INSERT INTO menus (label, type, order_index, icon) VALUES ('LEGISLAÇÃO', 'folder', 2, 'Gavel') RETURNING id INTO legis_id;
-          INSERT INTO menus (label, path, parent_id, order_index, type) VALUES ('LEI VIGENTE', 'folder', legis_id, 0, 'category');
-          INSERT INTO menus (label, path, parent_id, order_index, type) VALUES ('LEI NÃO VIGENTE', 'folder', legis_id, 1, 'category');
+          INSERT INTO menus (label, path, parent_id, order_index, type) VALUES ('ADMINISTRATIVA', 'folder', legis_id, 0, 'category');
+          INSERT INTO menus (label, type, parent_id, order_index, icon) VALUES ('FUNDIÁRIA', 'folder', legis_id, 1, 'Map') RETURNING id INTO legis_fundiaria_id;
+            INSERT INTO menus (label, path, parent_id, order_index, type) VALUES ('LEI VIGENTE', 'folder', legis_fundiaria_id, 0, 'category');
+            INSERT INTO menus (label, path, parent_id, order_index, type) VALUES ('LEI NÃO VIGENTE', 'folder', legis_fundiaria_id, 1, 'category');
+          INSERT INTO menus (label, path, parent_id, order_index, type) VALUES ('MODELOS DE REQUERIMENTOS', 'folder', legis_id, 2, 'category');
           
-          -- Home Link
-          INSERT INTO menus (label, path, order_index, icon) VALUES ('INÍCIO', 'home', -1, 'Home');
         END IF;
       END $$;
       
