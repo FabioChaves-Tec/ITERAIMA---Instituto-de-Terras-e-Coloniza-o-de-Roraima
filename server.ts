@@ -8,6 +8,7 @@ import cors from "cors";
 import dotenv from "dotenv";
 import multer from "multer";
 import fs from "fs";
+import OpenAI from "openai";
 
 dotenv.config();
 
@@ -85,9 +86,51 @@ const initDb = async () => {
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
 
+      CREATE TABLE IF NOT EXISTS menus (
+        id SERIAL PRIMARY KEY,
+        label TEXT NOT NULL,
+        path TEXT,
+        parent_id INTEGER REFERENCES menus(id) ON DELETE CASCADE,
+        order_index INTEGER DEFAULT 0,
+        icon TEXT,
+        is_external BOOLEAN DEFAULT FALSE,
+        type TEXT DEFAULT 'link'
+      );
+
       INSERT INTO settings (key, value) VALUES ('cover_photo', '/uploads/default-cover.jpg') ON CONFLICT DO NOTHING;
       INSERT INTO settings (key, value) VALUES ('logo_url', 'https://iteraimacidadao.rr.gov.br/cadastrousuarioexterno/include/images/marca/logo_iteraima.png') ON CONFLICT DO NOTHING;
       INSERT INTO settings (key, value) VALUES ('favicon_url', 'https://iteraimacidadao.rr.gov.br/cadastrousuarioexterno/include/images/marca/logo_iteraima.png') ON CONFLICT DO NOTHING;
+      
+      -- Seed Menus if empty
+      DO $$
+      DECLARE
+        inst_id INTEGER;
+        transp_id INTEGER;
+        legis_id INTEGER;
+      BEGIN
+        IF NOT EXISTS (SELECT 1 FROM menus) THEN
+          -- Institutional
+          INSERT INTO menus (label, type, order_index, icon) VALUES ('INSTITUCIONAL', 'folder', 0, 'Landmark') RETURNING id INTO inst_id;
+          INSERT INTO menus (label, path, parent_id, order_index) VALUES ('PRESIDÊNCIA', 'presidencia', inst_id, 0);
+          INSERT INTO menus (label, path, parent_id, order_index) VALUES ('DIRETORIAS', 'diretorias', inst_id, 1);
+          INSERT INTO menus (label, path, parent_id, order_index) VALUES ('GALERIA DE PRESIDENTES', 'galeria', inst_id, 2);
+
+          -- Transparency
+          INSERT INTO menus (label, type, order_index, icon) VALUES ('TRANSPARÊNCIA', 'folder', 1, 'Search') RETURNING id INTO transp_id;
+          INSERT INTO menus (label, path, parent_id, order_index, type) VALUES ('BALANÇO FINANCEIRO', 'folder', transp_id, 0, 'category');
+          INSERT INTO menus (label, path, parent_id, order_index, type) VALUES ('CONTRATAÇÃO DIRETA', 'folder', transp_id, 1, 'category');
+          INSERT INTO menus (label, path, parent_id, order_index, type) VALUES ('CONTRATOS E ADITIVOS', 'folder', transp_id, 2, 'category');
+          INSERT INTO menus (label, path, parent_id, order_index, type) VALUES ('EDITAIS', 'folder', transp_id, 3, 'category');
+
+          -- Legislation
+          INSERT INTO menus (label, type, order_index, icon) VALUES ('LEGISLAÇÃO', 'folder', 2, 'Gavel') RETURNING id INTO legis_id;
+          INSERT INTO menus (label, path, parent_id, order_index, type) VALUES ('LEI VIGENTE', 'folder', legis_id, 0, 'category');
+          INSERT INTO menus (label, path, parent_id, order_index, type) VALUES ('LEI NÃO VIGENTE', 'folder', legis_id, 1, 'category');
+          
+          -- Home Link
+          INSERT INTO menus (label, path, order_index, icon) VALUES ('INÍCIO', 'home', -1, 'Home');
+        END IF;
+      END $$;
       
       -- Initialize presidencia if empty
       INSERT INTO presidencia (id, name, photo_url, biography) 
@@ -407,6 +450,54 @@ async function startServer() {
     }
   });
 
+  // Menus API
+  app.get("/api/menus", async (req, res) => {
+    try {
+      const { rows } = await pool.query("SELECT * FROM menus ORDER BY order_index ASC, id ASC");
+      res.json(rows);
+    } catch (err) {
+      res.status(500).json({ message: "Erro ao buscar menus" });
+    }
+  });
+
+  app.post("/api/menus", authenticateToken, async (req: any, res) => {
+    if (req.user.role !== 'admin' && req.user.role !== 'editor') return res.sendStatus(403);
+    const { label, path, parent_id, order_index, icon, is_external, type } = req.body;
+    try {
+      const { rows } = await pool.query(
+        "INSERT INTO menus (label, path, parent_id, order_index, icon, is_external, type) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *",
+        [label, path, parent_id, order_index, icon, is_external, type]
+      );
+      res.json(rows[0]);
+    } catch (err) {
+      res.status(500).json({ message: "Erro ao criar menu" });
+    }
+  });
+
+  app.put("/api/menus/:id", authenticateToken, async (req: any, res) => {
+    if (req.user.role !== 'admin' && req.user.role !== 'editor') return res.sendStatus(403);
+    const { label, path, parent_id, order_index, icon, is_external, type } = req.body;
+    try {
+      const { rows } = await pool.query(
+        "UPDATE menus SET label = $1, path = $2, parent_id = $3, order_index = $4, icon = $5, is_external = $6, type = $7 WHERE id = $8 RETURNING *",
+        [label, path, parent_id, order_index, icon, is_external, type, req.params.id]
+      );
+      res.json(rows[0]);
+    } catch (err) {
+      res.status(500).json({ message: "Erro ao atualizar menu" });
+    }
+  });
+
+  app.delete("/api/menus/:id", authenticateToken, async (req: any, res) => {
+    if (req.user.role !== 'admin' && req.user.role !== 'editor') return res.sendStatus(403);
+    try {
+      await pool.query("DELETE FROM menus WHERE id = $1", [req.params.id]);
+      res.json({ message: "Menu removido com sucesso" });
+    } catch (err) {
+      res.status(500).json({ message: "Erro ao remover menu" });
+    }
+  });
+
   app.post("/api/upload", authenticateToken, upload.single("file"), (req: any, res) => {
     if (!req.file) return res.status(400).json({ message: "Nenhum arquivo enviado" });
     const fileUrl = `/uploads/${req.file.filename}`;
@@ -467,6 +558,77 @@ async function startServer() {
       res.json(rows);
     } catch (err) {
       res.status(500).json({ message: "Erro ao buscar documentos" });
+    }
+  });
+
+  // AI Chat Route
+  app.post("/api/ai/chat", async (req, res) => {
+    const { query, context } = req.body;
+    const apiKey = process.env.OPENAI_API_KEY;
+
+    if (!apiKey) {
+      return res.status(500).json({ message: "OpenAI API Key não configurada no servidor." });
+    }
+
+    try {
+      const openai = new OpenAI({ apiKey });
+
+      // Build context string similarly to the client-side service
+      const newsText = context.news
+        ? context.news.map((n: any) => `Notícia (${n.category}): ${n.title}\n${n.content}`).slice(0, 5).join('\n\n')
+        : '';
+
+      const presidenciaText = context.presidencia 
+        ? `Presidência: ${context.presidencia.name}\n${context.presidencia.biography}`
+        : '';
+      
+      const diretoriasText = context.diretorias
+        ? context.diretorias.map((d: any) => `Diretoria: ${d.name} - Diretor: ${d.director_name}`).join('\n')
+        : '';
+
+      const galeriaText = context.galeria
+        ? context.galeria.map((p: any) => `Ex-Presidente: ${p.name} (${p.period})`).join('\n')
+        : '';
+
+      const docsSummary = context.documents
+        ? context.documents.map((d: any) => `- ${d.name} (${d.category}, ${d.year}${d.month ? `, ${d.month}` : ''})`).slice(0, 20).join('\n')
+        : '';
+
+      const systemInstruction = `
+        Você é o Assistente Virtual do ITERAIMA (Instituto de Terras e Colonização de Roraima).
+        Sua missão é ajudar os cidadãos com informações sobre o instituto, notícias, transparência e documentos.
+        
+        --- INFORMAÇÕES INSTITUCIONAIS ---
+        ${presidenciaText}
+        ${diretoriasText}
+        ${galeriaText}
+        
+        --- NOTÍCIAS RECENTES ---
+        ${newsText}
+        
+        --- LISTA DE DOCUMENTOS NO PORTAL DA TRANSPARÊNCIA ---
+        ${docsSummary}
+        
+        --- INSTRUÇÕES ---
+        1. Responda de forma clara, educada e profissional.
+        2. Se a pergunta for sobre um documento que não está na lista, informe que ele pode não estar disponível digitalmente ainda.
+        3. Se você não souber a resposta, direcione o usuário para: protoiteraima@gmail.com ou (95) 98408-0403.
+        4. Use Markdown para formatar suas respostas.
+      `;
+
+      const response = await openai.chat.completions.create({
+        model: "gpt-4o",
+        messages: [
+          { role: "system", content: systemInstruction },
+          { role: "user", content: query }
+        ],
+        temperature: 0.7,
+      });
+
+      res.json({ text: response.choices[0].message.content });
+    } catch (error) {
+      console.error('Error in AI chat route:', error);
+      res.status(500).json({ message: "Erro ao processar solicitação de IA" });
     }
   });
 

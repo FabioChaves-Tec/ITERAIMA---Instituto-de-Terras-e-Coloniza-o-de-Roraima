@@ -11,7 +11,7 @@ O Portal ITERAIMA é uma aplicação full-stack moderna projetada para centraliz
 ### Principais Funcionalidades:
 - **Portal de Notícias:** Publicação e visualização de notícias institucionais.
 - **Portal da Transparência:** Organização e busca de documentos (editais, balanços, contratos) por categoria, ano e mês.
-- **Assistente Virtual (IA):** Chatbot inteligente integrado ao Google Gemini que responde dúvidas baseando-se no conteúdo do portal e documentos PDF.
+- **Assistente Virtual (IA):** Chatbot inteligente integrado à OpenAI (GPT-4o) que responde dúvidas baseando-se no conteúdo do portal.
 - **Painel Administrativo:** Área restrita para editores gerenciarem notícias, documentos, membros da diretoria e galeria de presidentes.
 - **Gestão de Conteúdo:** Upload de arquivos e fotos diretamente pelo painel.
 
@@ -37,7 +37,7 @@ A aplicação utiliza uma arquitetura de **Single Page Application (SPA)** com u
   - **Bcryptjs**: Criptografia de senhas.
 
 - **Inteligência Artificial:**
-  - **Google Gemini API (@google/genai)**: Motor de processamento de linguagem natural.
+  - **OpenAI API (GPT-4o)**: Motor de processamento de linguagem natural acessado via backend.
 
 ---
 
@@ -59,7 +59,7 @@ Abaixo está a localização dos itens principais do projeto:
     ├── components/
     │   └── AiAssistant.tsx # Componente do Chatbot de IA
     ├── services/
-    │   └── aiService.ts    # Lógica de integração com Google Gemini
+    │   └── aiService.ts    # Lógica de integração com OpenAI (via Backend)
     └── lib/
         └── pdfUtils.ts     # Utilitários para processamento de PDFs
 ```
@@ -98,7 +98,7 @@ Crie um arquivo `.env` na raiz do projeto com os seguintes campos:
 ```env
 DATABASE_URL=postgres://usuario:senha@localhost:5432/iteraima
 JWT_SECRET=sua_chave_secreta_aqui
-GEMINI_API_KEY=sua_chave_do_google_gemini
+OPENAI_API_KEY=sua_chave_da_openai
 ```
 
 ### Passo 3: Iniciar a Aplicação

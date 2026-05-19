@@ -65,36 +65,6 @@ const IMAGES = {
   news2: 'https://images.unsplash.com/photo-1500382017468-9049fed747ef?auto=format&fit=crop&q=80&w=800',
 };
 
-const transparencyCategories = [
-  'BALANÇO FINANCEIRO',
-  'CONTRATAÇÃO DIRETA',
-  'CONTRATOS E ADITIVOS',
-  'AVISO',
-  'COMUNICADO',
-  'DISPENSA',
-  'EDITAIS',
-  'INEXIGIBILIDADE',
-  'RESULTADO',
-  'SÍNTESE',
-  'ATA DE REGISTRO DE PREÇOS',
-  'PLANO DE CONTRATAÇÃO ANUAL – PCA',
-  'IMÓVEIS',
-  'REGULARIZADOS',
-  'NOTIFICAÇÕES',
-  'REQUERIMENTO DE REGULARIZAÇÃO',
-  'CONCURSOS E SELEÇÕES',
-  'DIÁRIAS',
-  'ESTAGIÁRIOS',
-  'FOLHA DE PAGAMENTO',
-  'TERCEIRIZADOS',
-  'ADMINISTRATIVA',
-  'FUNDIÁRIA',
-  'MODELOS DE REQUERIMENTOS',
-  'LEI VIGENTE',
-  'LEI NÃO VIGENTE',
-  'ACORDO DE COOPERAÇÃO TÉCNICA'
-];
-
 const MONTHS = [
   'JANEIRO', 'FEVEREIRO', 'MARÇO', 'ABRIL', 'MAIO', 'JUNHO',
   'JULHO', 'AGOSTO', 'SETEMBRO', 'OUTUBRO', 'NOVEMBRO', 'DEZEMBRO'
@@ -120,7 +90,15 @@ const stripHtml = (html: string) => {
   return doc.body.textContent || "";
 };
 
-// ITERAIMA Portal - v1.0.2
+const STATIC_CATEGORIES = [
+  'BALANÇO FINANCEIRO', 'CONTRATAÇÃO DIRETA', 'CONTRATOS E ADITIVOS', 'AVISO', 'COMUNICADO', 'DISPENSA', 'EDITAIS', 
+  'INEXIGIBILIDADE', 'RESULTADO', 'SÍNTESE', 'ATA DE REGISTRO DE PREÇOS', 'PLANO DE CONTRATAÇÃO ANUAL – PCA', 
+  'IMÓVEIS', 'REGULARIZADOS', 'NOTIFICAÇÕES', 'REQUERIMENTO DE REGULARIZAÇÃO', 'CONCURSOS E SELEÇÕES', 'DIÁRIAS', 
+  'ESTAGIÁRIOS', 'FOLHA DE PAGAMENTO', 'TERCEIRIZADOS', 'ADMINISTRATIVA', 'FUNDIÁRIA', 'MODELOS DE REQUERIMENTOS', 
+  'LEI VIGENTE', 'LEI NÃO VIGENTE', 'ACORDO DE COOPERAÇÃO TÉCNICA'
+];
+
+// ITERAIMA Portal - v1.0.3 - Triggering sync refresh
 export default function App() {
   const [showTransparenciaSub, setShowTransparenciaSub] = useState(false);
   const [openLevel2Menu, setOpenLevel2Menu] = useState<string | null>(null);
@@ -132,10 +110,20 @@ export default function App() {
   const [currentPage, setCurrentPage] = useState<'home' | 'news' | 'admin' | 'folder' | 'presidencia' | 'diretorias' | 'galeria' | 'news-detail'>('home');
   const [selectedNews, setSelectedNews] = useState<News | null>(null);
   const [editingNewsId, setEditingNewsId] = useState<number | null>(null);
-  const [adminTab, setAdminTab] = useState<'publish' | 'users' | 'documents' | 'settings'>('publish');
+  const [adminTab, setAdminTab] = useState<'publish' | 'users' | 'documents' | 'settings' | 'navigation'>('publish');
   const [selectedFolder, setSelectedFolder] = useState<{ label: string, items: any[] } | null>(null);
   const [selectedYear, setSelectedYear] = useState<string | null>(null);
   const [selectedMonth, setSelectedMonth] = useState<string | null>(null);
+  
+  const [menus, setMenus] = useState<api.MenuItem[]>([]);
+  const [isMenuManagerOpen, setIsMenuManagerOpen] = useState(false);
+  const [editingMenu, setEditingMenu] = useState<Partial<api.MenuItem> | null>(null);
+  const [isSavingMenu, setIsSavingMenu] = useState(false);
+
+  const dynamicCategories = React.useMemo(() => {
+    const fromMenus = menus.filter(m => m.type === 'category').map(m => m.label);
+    return Array.from(new Set([...STATIC_CATEGORIES, ...fromMenus]));
+  }, [menus]);
   
   // Institutional State
   const [presidencia, setPresidencia] = useState<Presidencia | null>(null);
@@ -206,6 +194,7 @@ export default function App() {
   const [publishSuccess, setPublishSuccess] = useState(false);
   const [publishError, setPublishError] = useState('');
 
+
   // Delete State
   const [deletingId, setDeletingId] = useState<number | null>(null);
 
@@ -225,7 +214,7 @@ export default function App() {
     // Initial data fetch
     const fetchData = async () => {
       try {
-        const [news, docs, cover, logo, favicon, pres, dir, gal] = await Promise.all([
+        const [news, docs, cover, logo, favicon, pres, dir, gal, menuItems] = await Promise.all([
           api.getNews(),
           api.getDocuments(),
           api.getCoverPhoto(),
@@ -233,7 +222,8 @@ export default function App() {
           api.getFavicon(),
           api.getPresidencia(),
           api.getDiretorias(),
-          api.getGaleria()
+          api.getGaleria(),
+          api.getMenus()
         ]);
         setNewsList(news);
         setDocuments(docs);
@@ -243,6 +233,7 @@ export default function App() {
         setPresidencia(pres);
         setDiretorias(dir);
         setGaleria(gal);
+        setMenus(menuItems);
       } catch (error) {
         console.error("Error fetching initial data:", error);
       } finally {
@@ -606,6 +597,59 @@ export default function App() {
     }
   };
 
+  const handleSaveMenu = async (e: FormEvent) => {
+    e.preventDefault();
+    if (!editingMenu) return;
+    setIsSavingMenu(true);
+    try {
+      if (editingMenu.id) {
+        await api.updateMenu(editingMenu.id, editingMenu);
+        toast.success('Menu atualizado');
+      } else {
+        await api.createMenu(editingMenu);
+        toast.success('Menu criado');
+      }
+      const updatedMenus = await api.getMenus();
+      setMenus(updatedMenus);
+      setEditingMenu(null);
+    } catch (err) {
+      toast.error('Erro ao salvar menu');
+    } finally {
+      setIsSavingMenu(false);
+    }
+  };
+
+  const handleDeleteMenu = async (id: number) => {
+    if (!confirm('Tem certeza que deseja excluir este menu? Submenus também serão excluídos.')) return;
+    try {
+      await api.deleteMenu(id);
+      setMenus(prev => prev.filter(m => m.id !== id));
+      toast.success('Menu excluído');
+    } catch (err) {
+      toast.error('Erro ao excluir menu');
+    }
+  };
+
+  const menuTree = React.useMemo(() => {
+    const buildTree = (parentId: number | null = null): any[] => {
+      return menus
+        .filter(m => m.parent_id === parentId)
+        .map(m => ({
+          ...m,
+          subItems: buildTree(m.id)
+        }));
+    };
+    return buildTree();
+  }, [menus]);
+
+  const getIcon = (iconName: string | undefined) => {
+    const icons: Record<string, any> = {
+      Home, Landmark, Search, Gavel, Wallet, Eye, Rss, Calendar, Folder, File, Users, Map, Scale, Newspaper, HelpCircle, 
+      UsersRound, UserRound, Globe: ExternalLink, ShieldCheck, ShieldAlert, FileText, FileSignature
+    };
+    return icons[iconName || ''] || File;
+  };
+
   const handleChangePassword = async (e: FormEvent) => {
     e.preventDefault();
     if (newPassword !== confirmPassword) {
@@ -677,400 +721,54 @@ export default function App() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  const transparenciaItems = [
-    { 
-      label: 'ACORDO DE COOPERAÇÃO TÉCNICA', 
-      icon: Handshake,
-      subItems: [
-        { label: '2026', icon: Calendar },
-        { label: '2025', icon: Calendar },
-        { label: '2024', icon: Calendar },
-        { label: '2023', icon: Calendar },
-        { label: '2022', icon: Calendar }
-      ]
-    },
-    { 
-      label: 'FINANCEIRA', 
-      icon: CircleDollarSign,
-      subItems: [
-        { 
-          label: 'BALANÇO FINANCEIRO', 
-          icon: FileText,
-          subItems: [
-            { label: '2022', icon: Calendar },
-            { label: '2023', icon: Calendar },
-            { label: '2024', icon: Calendar },
-            { label: '2025', icon: Calendar },
-            { label: '2026', icon: Calendar }
-          ]
-        },
-        { 
-          label: 'CONTRATAÇÃO DIRETA', 
-          icon: Handshake,
-          subItems: [
-            { label: '2022', icon: Calendar },
-            { label: '2023', icon: Calendar },
-            { label: '2024', icon: Calendar },
-            { label: '2025', icon: Calendar },
-            { label: '2026', icon: Calendar }
-          ]
-        },
-        { 
-          label: 'CONTRATOS E ADITIVOS', 
-          icon: FileSignature,
-          subItems: [
-            { label: '2022', icon: Calendar },
-            { label: '2023', icon: Calendar },
-            { label: '2024', icon: Calendar },
-            { label: '2025', icon: Calendar },
-            { label: '2026', icon: Calendar }
-          ]
-        },
-        { 
-          label: 'COSLIC', 
-          icon: ClipboardList,
-          subItems: [
-            { 
-              label: 'AVISO', 
-              icon: FileText,
-              subItems: [
-                { label: '2022', icon: Calendar },
-                { label: '2023', icon: Calendar },
-                { label: '2024', icon: Calendar },
-                { label: '2025', icon: Calendar },
-                { label: '2026', icon: Calendar }
-              ]
-            },
-            { 
-              label: 'COMUNICADO', 
-              icon: FileText,
-              subItems: [
-                { label: '2022', icon: Calendar },
-                { label: '2023', icon: Calendar },
-                { label: '2024', icon: Calendar },
-                { label: '2025', icon: Calendar },
-                { label: '2026', icon: Calendar }
-              ]
-            },
-            { 
-              label: 'DISPENSA', 
-              icon: FileText,
-              subItems: [
-                { label: '2022', icon: Calendar },
-                { label: '2023', icon: Calendar },
-                { label: '2024', icon: Calendar },
-                { label: '2025', icon: Calendar },
-                { label: '2026', icon: Calendar }
-              ]
-            },
-            { 
-              label: 'EDITAIS', 
-              icon: FileText,
-              subItems: [
-                { label: '2022', icon: Calendar },
-                { label: '2023', icon: Calendar },
-                { label: '2024', icon: Calendar },
-                { label: '2025', icon: Calendar },
-                { label: '2026', icon: Calendar }
-              ]
-            },
-            { 
-              label: 'INEXIGIBILIDADE', 
-              icon: FileText,
-              subItems: [
-                { label: '2022', icon: Calendar },
-                { label: '2023', icon: Calendar },
-                { label: '2024', icon: Calendar },
-                { label: '2025', icon: Calendar },
-                { label: '2026', icon: Calendar }
-              ]
-            },
-            { 
-              label: 'RESULTADO', 
-              icon: FileText,
-              subItems: [
-                { label: '2022', icon: Calendar },
-                { label: '2023', icon: Calendar },
-                { label: '2024', icon: Calendar },
-                { label: '2025', icon: Calendar },
-                { label: '2026', icon: Calendar }
-              ]
-            },
-            { 
-              label: 'SÍNTESE', 
-              icon: FileText,
-              subItems: [
-                { label: '2022', icon: Calendar },
-                { label: '2023', icon: Calendar },
-                { label: '2024', icon: Calendar },
-                { label: '2025', icon: Calendar },
-                { label: '2026', icon: Calendar }
-              ]
-            },
-            { 
-              label: 'ATA DE REGISTRO DE PREÇOS', 
-              icon: FileText,
-              subItems: [
-                { label: '2022', icon: Calendar },
-                { label: '2023', icon: Calendar },
-                { label: '2024', icon: Calendar },
-                { label: '2025', icon: Calendar },
-                { label: '2026', icon: Calendar }
-              ]
-            }
-          ]
-        },
-        { 
-          label: 'PLANO DE CONTRATAÇÃO ANUAL – PCA', 
-          icon: Calendar,
-          subItems: [
-            { label: '2022', icon: Calendar },
-            { label: '2023', icon: Calendar },
-            { label: '2024', icon: Calendar },
-            { label: '2025', icon: Calendar },
-            { label: '2026', icon: Calendar }
-          ]
-        }
-      ]
-    },
-    { 
-      label: 'FUNDIÁRIA', 
-      icon: Map,
-      subItems: [
-        { 
-          label: 'IMÓVEIS', 
-          icon: Home,
-          subItems: [
-            { label: '2026', icon: Calendar },
-            { label: '2025', icon: Calendar },
-            { label: '2024', icon: Calendar },
-            { label: '2023', icon: Calendar },
-            { label: '2022', icon: Calendar }
-          ]
-        },
-        { 
-          label: 'REGULARIZADOS', 
-          icon: FileSignature,
-          subItems: [
-            { label: '2026', icon: Calendar },
-            { label: '2025', icon: Calendar },
-            { label: '2024', icon: Calendar },
-            { label: '2023', icon: Calendar },
-            { label: '2022', icon: Calendar }
-          ]
-        },
-        { 
-          label: 'NOTIFICAÇÕES', 
-          icon: Rss,
-          subItems: [
-            { label: '2026', icon: Calendar },
-            { label: '2025', icon: Calendar },
-            { label: '2024', icon: Calendar },
-            { label: '2023', icon: Calendar },
-            { label: '2022', icon: Calendar }
-          ]
-        },
-        { 
-          label: 'REQUERIMENTO DE REGULARIZAÇÃO', 
-          icon: ClipboardList,
-          subItems: [
-            { label: '2026', icon: Calendar },
-            { label: '2025', icon: Calendar },
-            { label: '2024', icon: Calendar },
-            { label: '2023', icon: Calendar },
-            { label: '2022', icon: Calendar }
-          ]
-        }
-      ]
-    },
-    { 
-      label: 'DE PESSOAS', 
-      icon: Users,
-      subItems: [
-        { 
-          label: 'CONCURSOS E SELEÇÕES', 
-          icon: UsersRound,
-          subItems: [
-            { label: '2026', icon: Calendar },
-            { label: '2025', icon: Calendar },
-            { label: '2024', icon: Calendar },
-            { label: '2023', icon: Calendar },
-            { label: '2022', icon: Calendar }
-          ]
-        },
-        { 
-          label: 'DIÁRIAS', 
-          icon: CircleDollarSign,
-          subItems: [
-            { label: '2026', icon: Calendar },
-            { label: '2025', icon: Calendar },
-            { label: '2024', icon: Calendar },
-            { label: '2023', icon: Calendar },
-            { label: '2022', icon: Calendar }
-          ]
-        },
-        { 
-          label: 'ESTAGIÁRIOS', 
-          icon: UserRound,
-          subItems: [
-            { 
-              label: '2026', 
-              icon: Calendar,
-              subItems: MONTHS.map(m => ({ label: m, icon: Clock }))
-            },
-            { 
-              label: '2025', 
-              icon: Calendar,
-              subItems: MONTHS.map(m => ({ label: m, icon: Clock }))
-            },
-            { 
-              label: '2024', 
-              icon: Calendar,
-              subItems: MONTHS.map(m => ({ label: m, icon: Clock }))
-            },
-            { 
-              label: '2023', 
-              icon: Calendar,
-              subItems: MONTHS.map(m => ({ label: m, icon: Clock }))
-            },
-            { 
-              label: '2022', 
-              icon: Calendar,
-              subItems: MONTHS.map(m => ({ label: m, icon: Clock }))
-            }
-          ]
-        },
-        { 
-          label: 'FOLHA DE PAGAMENTO', 
-          icon: FileText,
-          subItems: [
-            { 
-              label: '2026', 
-              icon: Calendar,
-              subItems: MONTHS.map(m => ({ label: m, icon: Clock }))
-            },
-            { 
-              label: '2025', 
-              icon: Calendar,
-              subItems: MONTHS.map(m => ({ label: m, icon: Clock }))
-            },
-            { 
-              label: '2024', 
-              icon: Calendar,
-              subItems: MONTHS.map(m => ({ label: m, icon: Clock }))
-            },
-            { 
-              label: '2023', 
-              icon: Calendar,
-              subItems: MONTHS.map(m => ({ label: m, icon: Clock }))
-            },
-            { 
-              label: '2022', 
-              icon: Calendar,
-              subItems: MONTHS.map(m => ({ label: m, icon: Clock }))
-            }
-          ]
-        },
-        { 
-          label: 'TERCEIRIZADOS', 
-          icon: Handshake,
-          subItems: [
-            { 
-              label: '2026', 
-              icon: Calendar,
-              subItems: MONTHS.map(m => ({ label: m, icon: Clock }))
-            },
-            { 
-              label: '2025', 
-              icon: Calendar,
-              subItems: MONTHS.map(m => ({ label: m, icon: Clock }))
-            },
-            { 
-              label: '2024', 
-              icon: Calendar,
-              subItems: MONTHS.map(m => ({ label: m, icon: Clock }))
-            },
-            { 
-              label: '2023', 
-              icon: Calendar,
-              subItems: MONTHS.map(m => ({ label: m, icon: Clock }))
-            },
-            { 
-              label: '2022', 
-              icon: Calendar,
-              subItems: MONTHS.map(m => ({ label: m, icon: Clock }))
-            }
-          ]
-        }
-      ]
-    }
-  ];
-
   const governoLinks = [
     { label: 'PORTAL DA TRANSPARÊNCIA', icon: Eye, url: 'https://www.transparencia.rr.gov.br/' },
     { label: 'OUVIDORIA GERAL', icon: HelpCircle, url: 'https://ouvidoria.rr.gov.br/' },
     { label: 'DIÁRIO OFICIAL', icon: Newspaper, url: 'https://www.imprensaoficial.rr.gov.br/app/_inicial/' },
-    { label: 'ACESSO À INFORMAÇÃO', icon: FileText, url: 'https://falabr.cgu.gov.br/web/home' }
+    { label: 'FALA.BR', icon: FileText, url: 'https://falabr.cgu.gov.br/web/home' }
   ];
 
-  const institucionalItems = [
-    { label: 'PRESIDÊNCIA', icon: UserRound },
-    { label: 'DIRETORIAS', icon: UsersRound },
-    { label: 'GALERIA DE PRESIDENTES', icon: Image }
-  ];
+  const institucionalItems = React.useMemo(() => {
+    const inst = menuTree.find(m => m.label === 'INSTITUCIONAL');
+    return inst ? inst.subItems.map((s: any) => ({ ...s, icon: getIcon(s.icon) })) : [];
+  }, [menuTree]);
 
-  const legislacaoItems = [
-    { 
-      label: 'ADMINISTRATIVA', 
-      icon: Scale,
-      subItems: [
+  const transparenciaItems = React.useMemo(() => {
+    const transp = menuTree.find(m => m.label === 'TRANSPARÊNCIA');
+    const items = transp ? transp.subItems.map((s: any) => ({ 
+      ...s, 
+      icon: getIcon(s.icon),
+      subItems: s.subItems.length > 0 ? s.subItems.map((ss: any) => ({ ...ss, icon: getIcon(ss.icon) })) : [
         { label: '2026', icon: Calendar },
         { label: '2025', icon: Calendar },
         { label: '2024', icon: Calendar },
         { label: '2023', icon: Calendar },
         { label: '2022', icon: Calendar }
       ]
-    },
-    { 
-      label: 'FUNDIÁRIA', 
-      icon: FileText,
-      subItems: [
-        { 
-          label: 'LEI VIGENTE', 
-          icon: ShieldCheck,
-          subItems: [
-            { label: '2026', icon: Calendar },
-            { label: '2025', icon: Calendar },
-            { label: '2024', icon: Calendar },
-            { label: '2023', icon: Calendar },
-            { label: '2022', icon: Calendar }
-          ]
-        },
-        { 
-          label: 'LEI NÃO VIGENTE', 
-          icon: ShieldAlert,
-          subItems: [
-            { label: '2026', icon: Calendar },
-            { label: '2025', icon: Calendar },
-            { label: '2024', icon: Calendar },
-            { label: '2023', icon: Calendar },
-            { label: '2022', icon: Calendar }
-          ]
-        }
-      ]
-    },
-    { 
-      label: 'MODELOS DE REQUERIMENTOS', 
-      icon: FileSignature,
-      subItems: [
+    })) : [];
+    return items;
+  }, [menuTree]);
+
+  const legislacaoItems = React.useMemo(() => {
+    const legis = menuTree.find(m => m.label === 'LEGISLAÇÃO');
+    const items = legis ? legis.subItems.map((s: any) => ({ 
+      ...s, 
+      icon: getIcon(s.icon),
+      subItems: s.subItems.length > 0 ? s.subItems.map((ss: any) => ({ ...ss, icon: getIcon(ss.icon) })) : [
         { label: '2026', icon: Calendar },
         { label: '2025', icon: Calendar },
         { label: '2024', icon: Calendar },
         { label: '2023', icon: Calendar },
         { label: '2022', icon: Calendar }
       ]
-    }
-  ];
+    })) : [];
+    return items;
+  }, [menuTree]);
+
+  const customMenuItems = React.useMemo(() => {
+    const reserved = ['INSTITUCIONAL', 'TRANSPARÊNCIA', 'LEGISLAÇÃO', 'NOTÍCIAS', 'INÍCIO'];
+    return menuTree.filter(m => !reserved.includes(m.label));
+  }, [menuTree]);
 
   return (
     <div className="min-h-screen bg-background text-on-surface font-body pb-24">
@@ -1105,152 +803,95 @@ export default function App() {
               </div>
 
               <div className="space-y-6 overflow-y-auto flex-1">
-                <div>
-                  <div className="flex items-center gap-3 text-primary font-bold text-sm mb-4 px-2">
-                    <Eye className="w-5 h-5" />
-                    TRANSPARÊNCIA
-                  </div>
-                  <div className="grid gap-2 pl-4 border-l-2 border-primary/10 ml-4">
-                    {transparenciaItems.map((item) => (
-                      <div key={item.label}>
-                        <button 
-                          onClick={() => {
-                            if (item.subItems) {
-                              if (item.subItems.some(i => i.label === '2022')) {
-                                setSelectedFolder({ label: item.label, items: item.subItems });
-                                setCurrentPage('folder');
-                                setIsSidebarOpen(false);
-                                return;
-                              }
-                              const isOpening = openLevel2Menu !== item.label;
-                              setOpenLevel2Menu(isOpening ? item.label : null);
-                              if (!isOpening) {
-                                setOpenLevel3Menu(null);
-                                setOpenLevel4Menu(null);
-                              }
-                            }
-                          }}
-                          className="flex items-center justify-between w-full p-3 rounded-xl hover:bg-primary/5 text-primary text-xs font-bold transition-colors text-left"
-                        >
-                          <div className="flex items-center gap-3">
-                            <item.icon className="w-4 h-4 opacity-60" />
-                            {item.label}
-                          </div>
-                          {item.subItems && !item.subItems.some(i => i.label === '2022') && (
-                            <ChevronRight className={`w-4 h-4 transition-transform ${openLevel2Menu === item.label ? 'rotate-90' : ''}`} />
-                          )}
-                        </button>
-                        
-                        {item.subItems && (
-                          <AnimatePresence>
-                            {openLevel2Menu === item.label && (
-                              <motion.div 
-                                initial={{ height: 0, opacity: 0 }}
-                                animate={{ height: 'auto', opacity: 1 }}
-                                exit={{ height: 0, opacity: 0 }}
-                                className="overflow-hidden grid gap-1 pl-6 border-l border-primary/10 ml-4 mt-1"
-                              >
-                                {item.subItems.map((sub) => (
-                                  <div key={sub.label}>
-                                    <button 
-                                      onClick={() => {
-                                        if (sub.subItems) {
-                                          if (sub.subItems.some(i => i.label === '2022')) {
-                                            setSelectedFolder({ label: sub.label, items: sub.subItems });
-                                            setCurrentPage('folder');
-                                            setIsSidebarOpen(false);
-                                          } else {
-                                            const isOpening = openLevel3Menu !== sub.label;
-                                            setOpenLevel3Menu(isOpening ? sub.label : null);
-                                            if (!isOpening) {
-                                              setOpenLevel4Menu(null);
-                                            }
-                                          }
-                                        }
-                                      }}
-                                      className="flex items-center justify-between w-full p-2 rounded-lg hover:bg-primary/5 text-primary/70 text-[10px] font-bold transition-colors text-left"
-                                    >
-                                      <div className="flex items-center gap-3">
-                                        <sub.icon className="w-3 h-3 opacity-60" />
-                                        {sub.label}
-                                      </div>
-                                      {sub.subItems && (
-                                        <ChevronRight className={`w-3 h-3 transition-transform ${openLevel3Menu === sub.label ? 'rotate-90' : ''}`} />
-                                      )}
-                                    </button>
-                                    
-                                    {sub.subItems && (
-                                      <AnimatePresence>
-                                        {openLevel3Menu === sub.label && (
-                                          <motion.div 
-                                            initial={{ height: 0, opacity: 0 }}
-                                            animate={{ height: 'auto', opacity: 1 }}
-                                            exit={{ height: 0, opacity: 0 }}
-                                            className="overflow-hidden grid gap-1 pl-6 border-l border-primary/5 ml-2 mt-1"
-                                          >
-                                            {sub.subItems.map((subItem) => (
-                                              <div key={subItem.label}>
-                                                <button 
-                                                  onClick={() => {
-                                                    if (subItem.subItems) {
-                                                      if (subItem.subItems.some(i => i.label === '2022')) {
-                                                        setSelectedFolder({ label: subItem.label, items: subItem.subItems });
-                                                        setCurrentPage('folder');
-                                                        setIsSidebarOpen(false);
-                                                      } else {
-                                                        setOpenLevel4Menu(openLevel4Menu === subItem.label ? null : subItem.label);
-                                                      }
-                                                    }
-                                                  }}
-                                                  className="flex items-center justify-between w-full p-1.5 rounded-md hover:bg-primary/5 text-primary/60 text-[9px] font-bold transition-colors text-left"
-                                                >
-                                                  <div className="flex items-center gap-2">
-                                                    <subItem.icon className="w-2.5 h-2.5 opacity-50" />
-                                                    {subItem.label}
-                                                  </div>
-                                                  {subItem.subItems && (
-                                                    <ChevronRight className={`w-2.5 h-2.5 transition-transform ${openLevel4Menu === subItem.label ? 'rotate-90' : ''}`} />
-                                                  )}
-                                                </button>
+                {menuTree.map((menu) => {
+                  const Icon = getIcon(menu.icon);
+                  const hasSubItems = menu.subItems && menu.subItems.length > 0;
+                  const isOpening = openLevel2Menu === menu.label;
 
-                                                {subItem.subItems && (
-                                                  <AnimatePresence>
-                                                    {openLevel4Menu === subItem.label && (
-                                                      <motion.div 
-                                                        initial={{ height: 0, opacity: 0 }}
-                                                        animate={{ height: 'auto', opacity: 1 }}
-                                                        exit={{ height: 0, opacity: 0 }}
-                                                        className="overflow-hidden grid gap-1 pl-4 border-l border-primary/5 ml-2 mt-1"
-                                                      >
-                                                        {subItem.subItems.map((leaf) => (
-                                                          <button 
-                                                            key={leaf.label}
-                                                            className="flex items-center gap-2 p-1 rounded-md hover:bg-primary/5 text-primary/50 text-[8px] font-bold transition-colors text-left"
-                                                          >
-                                                            <leaf.icon className="w-2 h-2 opacity-40" />
-                                                            {leaf.label}
-                                                          </button>
-                                                        ))}
-                                                      </motion.div>
-                                                    )}
-                                                  </AnimatePresence>
-                                                )}
-                                              </div>
-                                            ))}
-                                          </motion.div>
-                                        )}
-                                      </AnimatePresence>
-                                    )}
-                                  </div>
-                                ))}
-                              </motion.div>
-                            )}
-                          </AnimatePresence>
-                        )}
+                  return (
+                    <div key={menu.id}>
+                      <div 
+                        onClick={() => {
+                          if (hasSubItems) {
+                            setOpenLevel2Menu(isOpening ? null : menu.label);
+                          } else if (menu.type === 'link' && menu.path) {
+                            if (menu.path.startsWith('http')) {
+                              window.open(menu.path, '_blank');
+                            } else {
+                              setCurrentPage(menu.path as any);
+                            }
+                            setIsSidebarOpen(false);
+                          } else if (menu.type === 'category' || menu.type === 'folder') {
+                            setSelectedFolder({ label: menu.label, items: menu.subItems.length > 0 ? menu.subItems.map(s => ({...s, icon: getIcon(s.icon)})) : [
+                              { label: '2026', icon: Calendar },
+                              { label: '2025', icon: Calendar },
+                              { label: '2024', icon: Calendar },
+                              { label: '2023', icon: Calendar },
+                              { label: '2022', icon: Calendar }
+                            ]});
+                            setCurrentPage('folder');
+                            setIsSidebarOpen(false);
+                          }
+                        }}
+                        className={`flex items-center justify-between gap-3 font-bold text-sm w-full p-2 rounded-xl transition-colors cursor-pointer ${currentPage === menu.path ? 'bg-primary text-white' : 'text-secondary hover:bg-primary/5'}`}
+                      >
+                        <div className="flex items-center gap-3">
+                          <Icon className="w-5 h-5" />
+                          {menu.label}
+                        </div>
+                        {hasSubItems && <ChevronRight className={`w-4 h-4 transition-transform ${isOpening ? 'rotate-90' : ''}`} />}
                       </div>
-                    ))}
-                  </div>
-                </div>
+
+                      {hasSubItems && (
+                        <AnimatePresence>
+                          {isOpening && (
+                            <motion.div 
+                              initial={{ height: 0, opacity: 0 }}
+                              animate={{ height: 'auto', opacity: 1 }}
+                              exit={{ height: 0, opacity: 0 }}
+                              className="overflow-hidden grid gap-2 pl-4 border-l-2 border-primary/10 ml-4 mt-2"
+                            >
+                              {menu.subItems.map((sub: any) => {
+                                const SubIcon = getIcon(sub.icon);
+                                return (
+                                  <button 
+                                    key={sub.label}
+                                    onClick={() => {
+                                      if (sub.type === 'category' || sub.type === 'folder' || (sub.subItems && sub.subItems.length > 0)) {
+                                         setSelectedFolder({ 
+                                           label: sub.label, 
+                                           items: sub.subItems.length > 0 ? sub.subItems.map((ss: any) => ({...ss, icon: getIcon(ss.icon)})) : [
+                                            { label: '2026', icon: Calendar },
+                                            { label: '2025', icon: Calendar },
+                                            { label: '2024', icon: Calendar },
+                                            { label: '2023', icon: Calendar },
+                                            { label: '2022', icon: Calendar }
+                                          ]
+                                         });
+                                         setCurrentPage('folder');
+                                      } else if (sub.path) {
+                                        if (sub.path.startsWith('http')) {
+                                          window.open(sub.path, '_blank');
+                                        } else {
+                                          setCurrentPage(sub.path as any);
+                                        }
+                                      }
+                                      setIsSidebarOpen(false);
+                                    }}
+                                    className="flex items-center gap-3 p-3 rounded-xl hover:bg-primary/5 text-primary text-xs font-bold transition-colors text-left"
+                                  >
+                                    <SubIcon className="w-4 h-4 opacity-60" />
+                                    {sub.label}
+                                  </button>
+                                );
+                              })}
+                            </motion.div>
+                          )}
+                        </AnimatePresence>
+                      )}
+                    </div>
+                  );
+                })}
 
                 <a 
                   href="https://iteraimacidadao.rr.gov.br/"
@@ -1261,138 +902,6 @@ export default function App() {
                   <Wallet className="w-5 h-5" />
                   ITERAIMA CIDADÃO
                 </a>
-                <div>
-                  <div 
-                    onClick={() => setShowInstitucionalSub(!showInstitucionalSub)}
-                    className="flex items-center justify-between gap-3 text-secondary font-bold text-sm w-full p-2 rounded-xl hover:bg-primary/5 transition-colors cursor-pointer"
-                  >
-                    <div className="flex items-center gap-3">
-                      <Landmark className="w-5 h-5" />
-                      INSTITUCIONAL
-                    </div>
-                    <ChevronRight className={`w-4 h-4 transition-transform ${showInstitucionalSub ? 'rotate-90' : ''}`} />
-                  </div>
-                  <AnimatePresence>
-                    {showInstitucionalSub && (
-                      <motion.div 
-                        initial={{ height: 0, opacity: 0 }}
-                        animate={{ height: 'auto', opacity: 1 }}
-                        exit={{ height: 0, opacity: 0 }}
-                        className="overflow-hidden grid gap-2 pl-4 border-l-2 border-primary/10 ml-4 mt-2"
-                      >
-                        {institucionalItems.map((item) => (
-                          <button 
-                            key={item.label}
-                            onClick={() => {
-                              if (item.label === 'PRESIDÊNCIA') setCurrentPage('presidencia');
-                              if (item.label === 'DIRETORIAS') setCurrentPage('diretorias');
-                              if (item.label === 'GALERIA DE PRESIDENTES') setCurrentPage('galeria');
-                              setIsSidebarOpen(false);
-                            }}
-                            className="flex items-center gap-3 p-3 rounded-xl hover:bg-primary/5 text-primary text-xs font-bold transition-colors text-left"
-                          >
-                            <item.icon className="w-4 h-4 opacity-60" />
-                            {item.label}
-                          </button>
-                        ))}
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
-                </div>
-                <div>
-                  <div 
-                    onClick={() => setShowLegislacaoSub(!showLegislacaoSub)}
-                    className="flex items-center justify-between gap-3 text-secondary font-bold text-sm w-full p-2 rounded-xl hover:bg-primary/5 transition-colors cursor-pointer"
-                  >
-                    <div className="flex items-center gap-3">
-                      <Gavel className="w-5 h-5" />
-                      LEGISLAÇÃO
-                    </div>
-                    <ChevronRight className={`w-4 h-4 transition-transform ${showLegislacaoSub ? 'rotate-90' : ''}`} />
-                  </div>
-                  <AnimatePresence>
-                    {showLegislacaoSub && (
-                      <motion.div 
-                        initial={{ height: 0, opacity: 0 }}
-                        animate={{ height: 'auto', opacity: 1 }}
-                        exit={{ height: 0, opacity: 0 }}
-                        className="overflow-hidden grid gap-2 pl-4 border-l-2 border-primary/10 ml-4 mt-2"
-                      >
-                        {legislacaoItems.map((item) => (
-                          <div key={item.label}>
-                            <button 
-                              onClick={() => {
-                                if (item.subItems) {
-                                  if (item.subItems.some(i => i.label === '2022')) {
-                                    setSelectedFolder({ label: item.label, items: item.subItems });
-                                    setCurrentPage('folder');
-                                    setIsSidebarOpen(false);
-                                  } else {
-                                    const isOpening = openLevel2Menu !== item.label;
-                                    setOpenLevel2Menu(isOpening ? item.label : null);
-                                    if (!isOpening) {
-                                      setOpenLevel3Menu(null);
-                                      setOpenLevel4Menu(null);
-                                    }
-                                  }
-                                }
-                              }}
-                              className="flex items-center justify-between w-full p-3 rounded-xl hover:bg-primary/5 text-primary text-xs font-bold transition-colors text-left"
-                            >
-                              <div className="flex items-center gap-3">
-                                <item.icon className="w-4 h-4 opacity-60" />
-                                {item.label}
-                              </div>
-                              {item.subItems && !item.subItems.some(i => i.label === '2022') && (
-                                <ChevronRight className={`w-4 h-4 transition-transform ${openLevel2Menu === item.label ? 'rotate-90' : ''}`} />
-                              )}
-                            </button>
-
-                            {item.subItems && !item.subItems.some(i => i.label === '2022') && (
-                              <AnimatePresence>
-                                {openLevel2Menu === item.label && (
-                                  <motion.div 
-                                    initial={{ height: 0, opacity: 0 }}
-                                    animate={{ height: 'auto', opacity: 1 }}
-                                    exit={{ height: 0, opacity: 0 }}
-                                    className="overflow-hidden grid gap-1 pl-6 border-l border-primary/10 ml-4 mt-1"
-                                  >
-                                    {item.subItems.map((sub) => (
-                                      <button 
-                                        key={sub.label}
-                                        onClick={() => {
-                                          if (sub.subItems) {
-                                            setSelectedFolder({ label: sub.label, items: sub.subItems });
-                                            setCurrentPage('folder');
-                                            setIsSidebarOpen(false);
-                                          }
-                                        }}
-                                        className="flex items-center gap-3 w-full p-2 rounded-lg hover:bg-primary/5 text-primary/70 text-[10px] font-bold transition-colors text-left"
-                                      >
-                                        <sub.icon className="w-3 h-3 opacity-60" />
-                                        {sub.label}
-                                      </button>
-                                    ))}
-                                  </motion.div>
-                                )}
-                              </AnimatePresence>
-                            )}
-                          </div>
-                        ))}
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
-                </div>
-                <button 
-                  onClick={() => {
-                    setCurrentPage('news');
-                    setIsSidebarOpen(false);
-                  }}
-                  className={`flex items-center gap-3 font-bold text-sm w-full p-2 rounded-xl transition-colors ${currentPage === 'news' ? 'bg-primary text-white' : 'text-secondary hover:bg-primary/5'}`}
-                >
-                  <Rss className="w-5 h-5" />
-                  NOTÍCIAS
-                </button>
 
                 {user && (
                   <button 
@@ -1403,7 +912,7 @@ export default function App() {
                     className={`flex items-center gap-3 font-bold text-sm w-full p-2 rounded-xl transition-colors ${currentPage === 'admin' ? 'bg-primary text-white' : 'text-secondary hover:bg-primary/5'}`}
                   >
                     <Plus className="w-5 h-5" />
-                    PUBLICAR NOTÍCIA
+                    PAINEL ADMIN
                   </button>
                 )}
               </div>
@@ -1833,6 +1342,39 @@ export default function App() {
                   </div>
                   <span className="font-headline font-bold text-primary text-sm">Notícias</span>
                 </motion.div>
+
+                {/* Custom Dynamic Menus (The "WordPress" style folders) */}
+                {customMenuItems.map((menu) => (
+                  <motion.div 
+                    key={menu.id}
+                    whileHover={{ y: -4 }}
+                    onClick={() => {
+                      if (menu.type === 'category' || menu.type === 'folder') {
+                        setSelectedFolder({ label: menu.label, items: menu.subItems.length > 0 ? menu.subItems.map(s => ({...s, icon: getIcon(s.icon)})) : [
+                          { label: '2026', icon: Calendar },
+                          { label: '2025', icon: Calendar },
+                          { label: '2024', icon: Calendar },
+                          { label: '2023', icon: Calendar },
+                          { label: '2022', icon: Calendar }
+                        ]});
+                        setCurrentPage('folder');
+                      } else if (menu.type === 'link' && menu.path) {
+                        if (menu.path.startsWith('http')) {
+                          window.open(menu.path, '_blank');
+                        } else {
+                          setCurrentPage(menu.path as any);
+                        }
+                      }
+                      scrollToTop();
+                    }}
+                    className="bg-surface-container-lowest p-6 rounded-3xl shadow-[0_8px_32px_rgba(0,34,2,0.06)] flex flex-col items-center justify-center text-center gap-3 cursor-pointer"
+                  >
+                    <div className="w-14 h-14 bg-surface-container-high rounded-full flex items-center justify-center text-primary">
+                      {React.createElement(getIcon(menu.icon), { className: 'w-8 h-8' })}
+                    </div>
+                    <span className="font-headline font-bold text-primary text-sm line-clamp-1 truncate w-full px-2">{menu.label}</span>
+                  </motion.div>
+                ))}
               </div>
             </section>
 
@@ -2335,6 +1877,15 @@ export default function App() {
                         DOCUMENTOS
                       </button>
                     )}
+                    {(user.role === 'admin' || user.role === 'editor') && (
+                      <button 
+                        onClick={() => setAdminTab('navigation')}
+                        className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl font-bold text-xs transition-all ${adminTab === 'navigation' ? 'bg-primary text-white shadow-lg shadow-primary/20' : 'text-secondary hover:bg-primary/5'}`}
+                      >
+                        <Menu className="w-4 h-4" />
+                        NAVEGAÇÃO
+                      </button>
+                    )}
                     <button 
                       onClick={() => setAdminTab('settings')}
                       className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl font-bold text-xs transition-all ${adminTab === 'settings' ? 'bg-primary text-white shadow-lg shadow-primary/20' : 'text-secondary hover:bg-primary/5'}`}
@@ -2653,7 +2204,7 @@ export default function App() {
                             onChange={(e) => setUploadCategory(e.target.value)}
                             className="w-full bg-surface-container-low border-none rounded-2xl px-4 py-3 text-sm focus:ring-2 focus:ring-primary transition-all"
                           >
-                            {transparencyCategories.map(cat => (
+                            {dynamicCategories.map(cat => (
                               <option key={cat} value={cat}>{cat}</option>
                             ))}
                           </select>
@@ -2747,6 +2298,230 @@ export default function App() {
                         )}
                       </button>
                     </div>
+                  </div>
+                )}
+
+                {adminTab === 'navigation' && (
+                  <div className="bg-white p-8 rounded-3xl shadow-xl border border-primary/5 space-y-8">
+                    <div className="flex items-center justify-between mb-4">
+                      <div className="flex items-center gap-4">
+                        <div className="w-12 h-12 bg-primary/10 rounded-2xl flex items-center justify-center text-primary">
+                          <Menu className="w-6 h-6" />
+                        </div>
+                        <div>
+                          <h3 className="text-2xl font-black text-on-surface font-headline leading-none">Gerenciar Navegação</h3>
+                          <p className="text-xs text-secondary mt-1">Configure menus, submenus e pastas (WordPress Style)</p>
+                        </div>
+                      </div>
+                      <button 
+                        onClick={() => {
+                          setEditingMenu({ label: '', path: '', type: 'folder', icon: 'Folder', order_index: menus.length });
+                          setIsMenuManagerOpen(true);
+                        }}
+                        className="bg-primary text-white font-bold px-6 py-3 rounded-2xl shadow-lg shadow-primary/20 hover:scale-105 active:scale-95 transition-all flex items-center gap-2 text-xs uppercase tracking-widest"
+                      >
+                        <Plus className="w-4 h-4" />
+                        NOVO MENU / PASTA
+                      </button>
+                    </div>
+
+                    <div className="grid gap-4">
+                      {menus.filter(m => !m.parent_id).sort((a, b) => a.order_index - b.order_index).map((menu) => (
+                        <div key={menu.id} className="bg-surface-container-lowest border border-primary/5 rounded-2xl overflow-hidden">
+                          <div className="p-4 flex items-center justify-between bg-primary/5">
+                            <div className="flex items-center gap-3">
+                              {React.createElement(getIcon(menu.icon), { className: 'w-5 h-5 text-primary' })}
+                              <div className="flex flex-col">
+                                <span className="text-sm font-black text-primary uppercase tracking-wider">{menu.label}</span>
+                                <span className="text-[9px] text-secondary font-bold font-mono">TYPE: {menu.type} | PATH: {menu.path || 'N/A'}</span>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <button 
+                                onClick={() => {
+                                  setEditingMenu({ ...menu, parent_id: menu.id, label: '', path: '', type: 'category', icon: 'Folder' });
+                                  setIsMenuManagerOpen(true);
+                                }}
+                                className="p-2 text-primary hover:bg-primary/10 rounded-xl transition-all"
+                                title="Adicionar Submenu"
+                              >
+                                <Plus className="w-4 h-4" />
+                              </button>
+                              <button 
+                                onClick={() => {
+                                  setEditingMenu(menu);
+                                  setIsMenuManagerOpen(true);
+                                }}
+                                className="p-2 text-primary hover:bg-primary/10 rounded-xl transition-all"
+                              >
+                                <Edit2 className="w-4 h-4" />
+                              </button>
+                              <button 
+                                onClick={() => handleDeleteMenu(menu.id!)}
+                                className="p-2 text-red-500 hover:bg-red-50 rounded-xl transition-all"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            </div>
+                          </div>
+                          
+                          {/* Submenus */}
+                          <div className="p-2 space-y-2">
+                            {menus.filter(m => m.parent_id === menu.id).sort((a, b) => a.order_index - b.order_index).map((sub) => (
+                              <div key={sub.id} className="ml-8 p-3 rounded-xl bg-white border border-primary/5 flex items-center justify-between group hover:border-primary/10 transition-all">
+                                <div className="flex items-center gap-3">
+                                  {React.createElement(getIcon(sub.icon), { className: 'w-4 h-4 text-primary opacity-60' })}
+                                  <div className="flex flex-col">
+                                    <span className="text-xs font-bold text-on-surface">{sub.label}</span>
+                                    <span className="text-[8px] text-secondary font-mono capitalize">{sub.type}</span>
+                                  </div>
+                                </div>
+                                <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                  <button 
+                                    onClick={() => {
+                                      setEditingMenu(sub);
+                                      setIsMenuManagerOpen(true);
+                                    }}
+                                    className="p-1.5 text-primary hover:bg-primary/5 rounded-lg"
+                                  >
+                                    <Edit2 className="w-3 h-3" />
+                                  </button>
+                                  <button 
+                                    onClick={() => handleDeleteMenu(sub.id!)}
+                                    className="p-1.5 text-red-500 hover:bg-red-50 rounded-lg"
+                                  >
+                                    <Trash2 className="w-3 h-3" />
+                                  </button>
+                                </div>
+                              </div>
+                            ))}
+                            {menus.filter(m => m.parent_id === menu.id).length === 0 && (
+                              <p className="text-[10px] text-secondary italic text-center py-2">Nenhum submenu cadastrado</p>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* Menu Editor Modal */}
+                    <AnimatePresence>
+                      {isMenuManagerOpen && (
+                        <div className="fixed inset-0 z-[100] flex items-center justify-center p-6">
+                          <motion.div 
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            exit={{ opacity: 0 }}
+                            onClick={() => setIsMenuManagerOpen(false)}
+                            className="absolute inset-0 bg-black/60 backdrop-blur-md"
+                          />
+                          <motion.div 
+                            initial={{ scale: 0.9, opacity: 0, y: 20 }}
+                            animate={{ scale: 1, opacity: 1, y: 0 }}
+                            exit={{ scale: 0.9, opacity: 0, y: 20 }}
+                            className="bg-white w-full max-w-lg rounded-[2.5rem] p-8 shadow-2xl relative z-10 max-h-[90vh] overflow-y-auto"
+                          >
+                            <h3 className="text-2xl font-black text-primary font-headline uppercase tracking-wider mb-6">
+                              {editingMenu?.id && !editingMenu.parent_id === editingMenu.id ? 'Editar Menu' : 'Novo Menu / Submenu'}
+                            </h3>
+                            
+                            <div className="space-y-4">
+                              <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                  <label className="block text-[10px] font-bold text-secondary uppercase tracking-widest mb-1.5 ml-1">Rótulo (Label)</label>
+                                  <input 
+                                    type="text" 
+                                    value={editingMenu?.label || ''}
+                                    onChange={(e) => setEditingMenu({ ...editingMenu!, label: e.target.value })}
+                                    className="w-full bg-surface-container-low border-none rounded-2xl px-4 py-3 text-sm focus:ring-2 focus:ring-primary transition-all"
+                                    placeholder="Ex: Licitações"
+                                  />
+                                </div>
+                                <div>
+                                  <label className="block text-[10px] font-bold text-secondary uppercase tracking-widest mb-1.5 ml-1">Tipo</label>
+                                  <select 
+                                    value={editingMenu?.type || 'folder'}
+                                    onChange={(e) => setEditingMenu({ ...editingMenu!, type: e.target.value as any })}
+                                    className="w-full bg-surface-container-low border-none rounded-2xl px-4 py-3 text-sm focus:ring-2 focus:ring-primary transition-all"
+                                  >
+                                    <option value="category">Categoria (Transparência)</option>
+                                    <option value="folder">Pasta (Genérica)</option>
+                                    <option value="link">Link Direto</option>
+                                  </select>
+                                </div>
+                              </div>
+
+                              <div>
+                                <label className="block text-[10px] font-bold text-secondary uppercase tracking-widest mb-1.5 ml-1">Caminho / URL</label>
+                                <input 
+                                  type="text" 
+                                  value={editingMenu?.path || ''}
+                                  onChange={(e) => setEditingMenu({ ...editingMenu!, path: e.target.value })}
+                                  className="w-full bg-surface-container-low border-none rounded-2xl px-4 py-3 text-sm focus:ring-2 focus:ring-primary transition-all font-mono"
+                                  placeholder="Ex: /transparencia ou https://..."
+                                />
+                              </div>
+
+                              <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                  <label className="block text-[10px] font-bold text-secondary uppercase tracking-widest mb-1.5 ml-1">Ícone (Lucide Icon Name)</label>
+                                  <div className="flex gap-2">
+                                    <input 
+                                      type="text" 
+                                      value={editingMenu?.icon || 'Folder'}
+                                      onChange={(e) => setEditingMenu({ ...editingMenu!, icon: e.target.value })}
+                                      className="flex-1 bg-surface-container-low border-none rounded-2xl px-4 py-3 text-sm focus:ring-2 focus:ring-primary transition-all"
+                                    />
+                                    <div className="w-11 h-11 bg-primary/5 rounded-xl flex items-center justify-center text-primary border border-primary/10">
+                                      {React.createElement(getIcon(editingMenu?.icon || 'Folder'), { className: 'w-6 h-6' })}
+                                    </div>
+                                  </div>
+                                </div>
+                                <div>
+                                  <label className="block text-[10px] font-bold text-secondary uppercase tracking-widest mb-1.5 ml-1">Ordem (Index)</label>
+                                  <input 
+                                    type="number" 
+                                    value={editingMenu?.order_index || 0}
+                                    onChange={(e) => setEditingMenu({ ...editingMenu!, order_index: parseInt(e.target.value) })}
+                                    className="w-full bg-surface-container-low border-none rounded-2xl px-4 py-3 text-sm focus:ring-2 focus:ring-primary transition-all"
+                                  />
+                                </div>
+                              </div>
+
+                              <div>
+                                <label className="flex items-center gap-3 cursor-pointer p-4 bg-surface-container-low rounded-2xl border border-transparent hover:border-primary/10 transition-all">
+                                  <input 
+                                    type="checkbox" 
+                                    checked={editingMenu?.is_external || false}
+                                    onChange={(e) => setEditingMenu({ ...editingMenu!, is_external: e.target.checked })}
+                                    className="w-5 h-5 rounded-lg border-2 border-primary/20 text-primary focus:ring-offset-0 focus:ring-0"
+                                  />
+                                  <div className="flex flex-col">
+                                    <span className="text-sm font-bold text-primary uppercase tracking-tight leading-none">Link Externo?</span>
+                                    <span className="text-[10px] text-secondary mt-1">Abrir em nova aba do navegador</span>
+                                  </div>
+                                </label>
+                              </div>
+
+                              <div className="pt-6 flex gap-3">
+                                <button 
+                                  onClick={() => setIsMenuManagerOpen(false)}
+                                  className="flex-1 bg-surface-container-high text-secondary font-bold py-4 rounded-2xl shadow-sm hover:bg-surface-bright active:scale-95 transition-all text-xs"
+                                >
+                                  CANCELAR
+                                </button>
+                                <button 
+                                  onClick={handleSaveMenu}
+                                  disabled={isSavingMenu || !editingMenu?.label}
+                                  className={`flex-[2] ${isSavingMenu || !editingMenu?.label ? 'bg-gray-400' : 'bg-primary'} text-white font-bold py-4 rounded-2xl shadow-lg shadow-primary/20 active:scale-95 transition-all flex items-center justify-center gap-2 text-xs`}
+                                >
+                                  {isSavingMenu ? 'SALVANDO...' : 'SALVAR MENU'}
+                                </button>
+                              </div>
+                            </div>
+                          </motion.div>
+                        </div>
+                      )}
+                    </AnimatePresence>
                   </div>
                 )}
 
@@ -3162,6 +2937,235 @@ export default function App() {
                             ))}
                           </div>
                         </div>
+                      </div>
+                    )}
+
+                    {adminTab === 'navigation' && (
+                      <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                        <div className="bg-white p-8 rounded-3xl shadow-xl border border-primary/5">
+                          <div className="flex items-center justify-between mb-8">
+                            <div className="flex items-center gap-4">
+                              <div className="w-12 h-12 bg-primary/10 rounded-2xl flex items-center justify-center text-primary">
+                                <Menu className="w-6 h-6" />
+                              </div>
+                              <div>
+                                <h3 className="text-2xl font-black text-on-surface font-headline leading-none uppercase">Gerenciar Menus</h3>
+                                <p className="text-sm text-secondary mt-1 uppercase tracking-tighter">Organize a estrutura de navegação do portal</p>
+                              </div>
+                            </div>
+                            <button 
+                              onClick={() => setEditingMenu({ label: '', path: '', type: 'link', order_index: 0, is_external: false, icon: 'File' })}
+                              className="px-6 py-3 bg-primary text-white rounded-2xl font-black text-xs uppercase tracking-widest shadow-lg shadow-primary/20 hover:scale-105 active:scale-95 transition-all flex items-center gap-2"
+                            >
+                              <Plus className="w-4 h-4" />
+                              Novo Menu
+                            </button>
+                          </div>
+
+                          <div className="space-y-4">
+                            {menus.filter(m => !m.parent_id).sort((a, b) => a.order_index - b.order_index).map(parent => (
+                              <div key={parent.id} className="space-y-2">
+                                <div className="flex items-center gap-4 p-4 bg-surface-container-low rounded-2xl border border-primary/5 hover:border-primary/20 transition-all group">
+                                  <div className="w-10 h-10 rounded-xl bg-white flex items-center justify-center text-primary">
+                                    {React.createElement(getIcon(parent.icon), { className: 'w-5 h-5' })}
+                                  </div>
+                                  <div className="flex-1">
+                                    <h4 className="font-black text-primary text-sm uppercase tracking-tight">{parent.label}</h4>
+                                    <p className="text-[10px] text-secondary font-bold uppercase tracking-tighter opacity-60">
+                                      {parent.type.toUpperCase()} {parent.path ? `| ${parent.path}` : ''}
+                                    </p>
+                                  </div>
+                                  <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-all">
+                                    <button 
+                                      onClick={() => setEditingMenu(parent)}
+                                      className="p-2 text-primary hover:bg-primary/10 rounded-lg transition-colors"
+                                      title="Editar"
+                                    >
+                                      <Settings className="w-4 h-4" />
+                                    </button>
+                                    <button 
+                                      onClick={() => handleDeleteMenu(parent.id)}
+                                      className="p-2 text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                                      title="Excluir"
+                                    >
+                                      <Trash2 className="w-4 h-4" />
+                                    </button>
+                                  </div>
+                                </div>
+
+                                {/* Submenus */}
+                                <div className="pl-12 space-y-2">
+                                  {menus.filter(m => m.parent_id === parent.id).sort((a, b) => a.order_index - b.order_index).map(child => (
+                                    <div key={child.id} className="flex items-center gap-4 p-3 bg-white rounded-xl border border-primary/10 hover:border-primary/30 transition-all group">
+                                      <div className="w-8 h-8 rounded-lg bg-surface-container-low flex items-center justify-center text-primary/70">
+                                        {React.createElement(getIcon(child.icon), { className: 'w-4 h-4' })}
+                                      </div>
+                                      <div className="flex-1">
+                                        <h5 className="font-bold text-primary text-xs uppercase">{child.label}</h5>
+                                        <p className="text-[9px] text-secondary font-medium uppercase tracking-tighter">
+                                          {child.type} {child.path ? `| ${child.path}` : ''}
+                                        </p>
+                                      </div>
+                                      <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-all">
+                                        <button 
+                                          onClick={() => setEditingMenu(child)}
+                                          className="p-1.5 text-primary hover:bg-primary/10 rounded-lg transition-colors"
+                                        >
+                                          <Settings className="w-3.5 h-3.5" />
+                                        </button>
+                                        <button 
+                                          onClick={() => handleDeleteMenu(child.id)}
+                                          className="p-1.5 text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                                        >
+                                          <Trash2 className="w-3.5 h-3.5" />
+                                        </button>
+                                      </div>
+                                    </div>
+                                  ))}
+                                  <button 
+                                    onClick={() => setEditingMenu({ label: '', path: '', type: 'link', parent_id: parent.id, order_index: 0, is_external: false, icon: 'File' })}
+                                    className="w-full py-2 border-2 border-dashed border-primary/10 rounded-xl text-[10px] font-black text-primary/40 uppercase tracking-widest hover:border-primary/30 hover:text-primary transition-all"
+                                  >
+                                    + Adicionar Submenu em {parent.label}
+                                  </button>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+
+                        {/* Modal de Edição de Menu */}
+                        <AnimatePresence>
+                          {editingMenu && (
+                            <div className="fixed inset-0 z-[100] flex items-center justify-center p-6">
+                              <motion.div 
+                                initial={{ opacity: 0 }}
+                                animate={{ opacity: 1 }}
+                                exit={{ opacity: 0 }}
+                                onClick={() => setEditingMenu(null)}
+                                className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+                              />
+                              <motion.div 
+                                initial={{ scale: 0.9, opacity: 0, y: 20 }}
+                                animate={{ scale: 1, opacity: 1, y: 0 }}
+                                exit={{ scale: 0.9, opacity: 0, y: 20 }}
+                                className="relative bg-[#e3fffb] w-full max-w-xl rounded-[2.5rem] shadow-2xl overflow-hidden border border-primary/10"
+                              >
+                                <div className="p-8">
+                                  <div className="flex items-center justify-between mb-8">
+                                    <h3 className="text-2xl font-black text-primary font-headline uppercase">
+                                      {editingMenu.id ? 'Editar Menu' : 'Novo Menu'}
+                                    </h3>
+                                    <button onClick={() => setEditingMenu(null)} className="p-2 rounded-full hover:bg-primary/5 transition-colors">
+                                      <X className="w-6 h-6 text-primary" />
+                                    </button>
+                                  </div>
+
+                                  <form onSubmit={handleSaveMenu} className="space-y-6">
+                                    <div className="grid grid-cols-2 gap-4">
+                                      <div className="col-span-2">
+                                        <label className="block text-[10px] font-black text-primary uppercase tracking-widest mb-2 ml-1">Rótulo (Label)</label>
+                                        <input 
+                                          type="text" 
+                                          value={editingMenu.label}
+                                          onChange={(e) => setEditingMenu({...editingMenu, label: e.target.value})}
+                                          className="w-full bg-white border-none rounded-2xl px-5 py-4 text-sm font-bold text-primary focus:ring-4 focus:ring-primary/10 transition-all shadow-sm"
+                                          placeholder="Ex: PORTAL DA TRANSPARÊNCIA"
+                                          required
+                                        />
+                                      </div>
+
+                                      <div>
+                                        <label className="block text-[10px] font-black text-primary uppercase tracking-widest mb-2 ml-1">Tipo</label>
+                                        <select 
+                                          value={editingMenu.type}
+                                          onChange={(e) => setEditingMenu({...editingMenu, type: e.target.value as any})}
+                                          className="w-full bg-white border-none rounded-2xl px-5 py-4 text-sm font-bold text-primary focus:ring-4 focus:ring-primary/10 transition-all shadow-sm"
+                                        >
+                                          <option value="link">Link Interno</option>
+                                          <option value="folder">Pasta / Agrupador</option>
+                                          <option value="category">Categoria de Documentos</option>
+                                          <option value="page">Página</option>
+                                        </select>
+                                      </div>
+
+                                      <div>
+                                        <label className="block text-[10px] font-black text-primary uppercase tracking-widest mb-2 ml-1">Ícone (Lucide Icon Name)</label>
+                                        <select 
+                                          value={editingMenu.icon}
+                                          onChange={(e) => setEditingMenu({...editingMenu, icon: e.target.value})}
+                                          className="w-full bg-white border-none rounded-2xl px-5 py-4 text-sm font-bold text-primary focus:ring-4 focus:ring-primary/10 transition-all shadow-sm"
+                                        >
+                                          <option value="File">Documento</option>
+                                          <option value="Folder">Pasta</option>
+                                          <option value="Landmark">Institucional</option>
+                                          <option value="Search">Transparência</option>
+                                          <option value="Gavel">Legislação</option>
+                                          <option value="Home">Início</option>
+                                          <option value="Rss">Notícias</option>
+                                          <option value="Users">Pessoas</option>
+                                          <option value="CircleDollarSign">Financeiro</option>
+                                          <option value="Map">Fundiário</option>
+                                        </select>
+                                      </div>
+
+                                      <div className="col-span-2">
+                                        <label className="block text-[10px] font-black text-primary uppercase tracking-widest mb-2 ml-1">Caminho (Path / Categoria)</label>
+                                        <input 
+                                          type="text" 
+                                          value={editingMenu.path}
+                                          onChange={(e) => setEditingMenu({...editingMenu, path: e.target.value})}
+                                          className="w-full bg-white border-none rounded-2xl px-5 py-4 text-sm font-bold text-primary focus:ring-4 focus:ring-primary/10 transition-all shadow-sm"
+                                          placeholder="Ex: home, presidencia, ou nome da categoria"
+                                        />
+                                      </div>
+
+                                      <div>
+                                        <label className="block text-[10px] font-black text-primary uppercase tracking-widest mb-2 ml-1">Ordem (order_index)</label>
+                                        <input 
+                                          type="number" 
+                                          value={editingMenu.order_index}
+                                          onChange={(e) => setEditingMenu({...editingMenu, order_index: parseInt(e.target.value)})}
+                                          className="w-full bg-white border-none rounded-2xl px-5 py-4 text-sm font-bold text-primary focus:ring-4 focus:ring-primary/10 transition-all shadow-sm"
+                                        />
+                                      </div>
+
+                                      <div>
+                                        <label className="block text-[10px] font-black text-primary uppercase tracking-widest mb-2 ml-1">Menu Pai</label>
+                                        <select 
+                                          value={editingMenu.parent_id || ''}
+                                          onChange={(e) => setEditingMenu({...editingMenu, parent_id: e.target.value ? parseInt(e.target.value) : null})}
+                                          className="w-full bg-white border-none rounded-2xl px-5 py-4 text-sm font-bold text-primary focus:ring-4 focus:ring-primary/10 transition-all shadow-sm"
+                                        >
+                                          <option value="">Nenhum (Top Level)</option>
+                                          {menus.filter(m => !m.parent_id && m.id !== editingMenu.id).map(m => (
+                                            <option key={m.id} value={m.id}>{m.label}</option>
+                                          ))}
+                                        </select>
+                                      </div>
+                                    </div>
+
+                                    <div className="flex gap-4 pt-4">
+                                      <button 
+                                        type="button"
+                                        onClick={() => setEditingMenu(null)}
+                                        className="flex-1 py-4 px-6 bg-white text-primary font-black text-xs uppercase tracking-widest rounded-2xl border border-primary/10 active:scale-95 transition-all"
+                                      >
+                                        CANCELAR
+                                      </button>
+                                      <button 
+                                        type="submit"
+                                        className="flex-1 py-4 px-6 bg-primary text-white font-black text-xs uppercase tracking-widest rounded-2xl shadow-lg shadow-primary/20 active:scale-95 transition-all"
+                                      >
+                                        {isSavingMenu ? 'SALVANDO...' : 'SALVAR MENU'}
+                                      </button>
+                                    </div>
+                                  </form>
+                                </div>
+                              </motion.div>
+                            </div>
+                          )}
+                        </AnimatePresence>
                       </div>
                     )}
                   </div>

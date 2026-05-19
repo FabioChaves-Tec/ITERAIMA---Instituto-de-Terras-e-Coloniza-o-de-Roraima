@@ -53,6 +53,17 @@ export interface GaleriaPresidente {
   created_at: string;
 }
 
+export interface MenuItem {
+  id: number;
+  label: string;
+  path?: string;
+  parent_id?: number | null;
+  order_index: number;
+  icon?: string;
+  is_external: boolean;
+  type: 'link' | 'folder' | 'page' | 'category';
+}
+
 const getHeaders = () => {
   const token = localStorage.getItem('token');
   return {
@@ -324,6 +335,41 @@ export const api = {
       headers: getHeaders()
     });
     if (!res.ok) throw new Error('Erro ao remover da galeria');
+    return res.json();
+  },
+
+  async getMenus(): Promise<MenuItem[]> {
+    const res = await fetch(`${API_URL}/api/menus`);
+    if (!res.ok) throw new Error('Erro ao buscar menus');
+    return res.json();
+  },
+
+  async createMenu(data: Partial<MenuItem>) {
+    const res = await fetch(`${API_URL}/api/menus`, {
+      method: 'POST',
+      headers: getHeaders(),
+      body: JSON.stringify(data)
+    });
+    if (!res.ok) throw new Error('Erro ao criar menu');
+    return res.json();
+  },
+
+  async updateMenu(id: number, data: Partial<MenuItem>) {
+    const res = await fetch(`${API_URL}/api/menus/${id}`, {
+      method: 'PUT',
+      headers: getHeaders(),
+      body: JSON.stringify(data)
+    });
+    if (!res.ok) throw new Error('Erro ao atualizar menu');
+    return res.json();
+  },
+
+  async deleteMenu(id: number) {
+    const res = await fetch(`${API_URL}/api/menus/${id}`, {
+      method: 'DELETE',
+      headers: getHeaders()
+    });
+    if (!res.ok) throw new Error('Erro ao remover menu');
     return res.json();
   }
 };
