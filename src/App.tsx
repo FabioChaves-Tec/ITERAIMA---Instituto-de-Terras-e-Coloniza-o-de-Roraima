@@ -51,6 +51,7 @@ import {
   UserPlus,
   Settings,
   Lock,
+  Edit2,
 } from 'lucide-react';
 import { Toaster, toast } from 'sonner';
 import { motion, AnimatePresence } from 'motion/react';
