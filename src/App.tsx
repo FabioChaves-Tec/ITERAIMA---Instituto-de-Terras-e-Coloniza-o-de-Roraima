@@ -52,6 +52,7 @@ import {
   Settings,
   Lock,
   Volume2,
+  MessageCircle,
 } from 'lucide-react';
 import { Toaster, toast } from 'sonner';
 import { motion, AnimatePresence } from 'motion/react';
@@ -3327,6 +3328,37 @@ export default function App() {
               </span>
             </a>
           ))}
+        </div>
+
+        {/* Ouvidoria ITERAIMA Card */}
+        <div id="acc-ouvidoria-box" className="w-full max-w-xl p-6 rounded-[2rem] bg-[#f2faf3] border border-[#00640f]/15 hover:border-[#00640f]/30 transition-all mb-4 text-center">
+          <div className="flex items-center justify-center gap-2 mb-2">
+            <span className="w-2 h-2 rounded-full bg-[#0a8019] animate-pulse" />
+            <h4 className="text-xs font-headline font-black text-[#00640f] uppercase tracking-widest">Ouvidoria ITERAIMA</h4>
+          </div>
+          <p className="text-[10px] text-secondary font-medium mb-4 max-w-md mx-auto leading-relaxed">
+            Canal direto para denúncias, solicitações, sugestões, reclamações e elogios. Clique nos botões abaixo para falar imediatamente com a nossa equipe.
+          </p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <a 
+              href="https://wa.me/5595991773573" 
+              target="_blank" 
+              rel="noopener noreferrer"
+              className="flex items-center justify-center gap-2.5 px-4 py-3 rounded-2xl bg-[#25d366] hover:bg-[#20ba5a] text-white font-bold text-xs uppercase tracking-wider shadow-sm hover:scale-[1.01] transition-all active:scale-95 duration-100"
+              title="Falar com a Ouvidoria por WhatsApp"
+            >
+              <MessageCircle className="w-4 h-4" />
+              WhatsApp: (95) 99177-3573
+            </a>
+            <a 
+              href="mailto:ouvidoriaiteraima@gmail.com"
+              className="flex items-center justify-center gap-2.5 px-4 py-3 rounded-2xl bg-[#00640f] hover:bg-[#004e0b] text-white font-bold text-xs uppercase tracking-wider shadow-sm hover:scale-[1.01] transition-all active:scale-95 duration-100"
+              title="Mandar e-mail para ouvidoriaiteraima@gmail.com"
+            >
+              <Mail className="w-4 h-4" />
+              ouvidoriaiteraima@gmail.com
+            </a>
+          </div>
         </div>
 
         <div className="flex flex-col gap-4 mb-6">
