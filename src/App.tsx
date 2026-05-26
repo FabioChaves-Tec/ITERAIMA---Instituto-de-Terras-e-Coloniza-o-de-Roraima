@@ -51,11 +51,13 @@ import {
   UserPlus,
   Settings,
   Lock,
+  Volume2,
 } from 'lucide-react';
 import { Toaster, toast } from 'sonner';
 import { motion, AnimatePresence } from 'motion/react';
 import React, { useState, useEffect, FormEvent } from 'react';
 import { api, User, News, TransparencyDocument, Presidencia, Diretoria, GaleriaPresidente } from './api';
+import { AccessibilityPanel } from './components/AccessibilityPanel';
 const AiAssistant = React.lazy(() => import('./components/AiAssistant').then(m => ({ default: m.AiAssistant })));
 
 const IMAGES = {
@@ -1074,6 +1076,9 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-background text-on-surface font-body pb-24">
+        {/* Painel de Acessibilidade */}
+        <AccessibilityPanel onPageChange={setCurrentPage} />
+
         {/* Sidebar / Drawer */}
         <AnimatePresence>
         {isSidebarOpen && (
@@ -1435,7 +1440,7 @@ export default function App() {
       </AnimatePresence>
 
       {/* TopAppBar */}
-      <header className="fixed top-0 w-full z-50 bg-background/80 backdrop-blur-xl shadow-[0_8px_32px_rgba(0,34,2,0.06)] flex justify-between items-center px-6 h-16">
+      <header className="fixed top-0 md:top-[34px] w-full z-50 bg-background/80 backdrop-blur-xl shadow-[0_8px_32px_rgba(0,34,2,0.06)] flex justify-between items-center px-6 h-16">
         <div 
           onClick={() => setIsSidebarOpen(true)}
           className="flex items-center gap-3 active:scale-95 duration-200 cursor-pointer"
@@ -1455,7 +1460,7 @@ export default function App() {
         </div>
       </header>
 
-      <main className="pt-16">
+      <main className="pt-16 md:pt-[98px]">
         {currentPage === 'home' && (
           <motion.div
             initial={{ opacity: 0 }}
@@ -2037,10 +2042,38 @@ export default function App() {
                 </div>
               </div>
               
-              <div className="p-8 md:p-12">
-                <div className="flex items-center gap-3 text-secondary font-medium uppercase tracking-widest text-[10px] mb-6">
-                  <Calendar className="w-4 h-4 text-primary" />
-                  <span>{new Date(selectedNews.created_at).toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' })}</span>
+              <div className="p-8 md:p-12 font-main">
+                <div className="flex flex-wrap items-center justify-between gap-4 mb-6 pb-6 border-b border-primary/10">
+                  <div className="flex items-center gap-3 text-secondary font-medium uppercase tracking-widest text-[10px]">
+                    <Calendar className="w-4 h-4 text-primary" />
+                    <span>{new Date(selectedNews.created_at).toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' })}</span>
+                  </div>
+
+                  <button
+                    id="listen-news-btn"
+                    onClick={() => {
+                      if ('speechSynthesis' in window) {
+                        window.speechSynthesis.cancel();
+                        const cleanContent = stripHtml(selectedNews.content);
+                        const utterance = new SpeechSynthesisUtterance(
+                          `${selectedNews.title}. Categoria: ${selectedNews.category}. Conteúdo da notícia: ${cleanContent}`
+                        );
+                        utterance.lang = 'pt-BR';
+                        const voices = window.speechSynthesis.getVoices();
+                        const ptVoice = voices.find(v => v.lang.includes('pt-BR') || v.lang.includes('pt_BR'));
+                        if (ptVoice) utterance.voice = ptVoice;
+                        window.speechSynthesis.speak(utterance);
+                        toast.success('Iniciando leitura por áudio da notícia completa.', { id: 'news-audio' });
+                      } else {
+                        toast.error('Navegador não suporta síntese de voz.');
+                      }
+                    }}
+                    className="flex items-center gap-2 px-4 py-2 bg-primary/10 hover:bg-primary/15 text-primary rounded-xl font-bold text-xs uppercase tracking-wider transition-all"
+                    title="Ouvir esta notícia completa em áudio"
+                  >
+                    <Volume2 className="w-4 h-4" />
+                    Ouvir Notícia
+                  </button>
                 </div>
                 
                 <h1 className="text-3xl md:text-5xl font-black text-on-surface font-headline leading-tight mb-8">
