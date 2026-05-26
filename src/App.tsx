@@ -51,11 +51,14 @@ import {
   UserPlus,
   Settings,
   Lock,
+  Volume2,
+  MessageCircle,
 } from 'lucide-react';
 import { Toaster, toast } from 'sonner';
 import { motion, AnimatePresence } from 'motion/react';
 import React, { useState, useEffect, FormEvent } from 'react';
 import { api, User, News, TransparencyDocument, Presidencia, Diretoria, GaleriaPresidente } from './api';
+import { AccessibilityPanel } from './components/AccessibilityPanel';
 const AiAssistant = React.lazy(() => import('./components/AiAssistant').then(m => ({ default: m.AiAssistant })));
 
 const IMAGES = {
@@ -1074,6 +1077,9 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-background text-on-surface font-body pb-24">
+        {/* Painel de Acessibilidade */}
+        <AccessibilityPanel onPageChange={setCurrentPage} />
+
         {/* Sidebar / Drawer */}
         <AnimatePresence>
         {isSidebarOpen && (
@@ -1435,7 +1441,7 @@ export default function App() {
       </AnimatePresence>
 
       {/* TopAppBar */}
-      <header className="fixed top-0 w-full z-50 bg-background/80 backdrop-blur-xl shadow-[0_8px_32px_rgba(0,34,2,0.06)] flex justify-between items-center px-6 h-16">
+      <header className="fixed top-0 md:top-[34px] w-full z-50 bg-background/80 backdrop-blur-xl shadow-[0_8px_32px_rgba(0,34,2,0.06)] flex justify-between items-center px-6 h-16">
         <div 
           onClick={() => setIsSidebarOpen(true)}
           className="flex items-center gap-3 active:scale-95 duration-200 cursor-pointer"
@@ -1455,7 +1461,7 @@ export default function App() {
         </div>
       </header>
 
-      <main className="pt-16">
+      <main className="pt-16 md:pt-[98px]">
         {currentPage === 'home' && (
           <motion.div
             initial={{ opacity: 0 }}
@@ -2037,10 +2043,38 @@ export default function App() {
                 </div>
               </div>
               
-              <div className="p-8 md:p-12">
-                <div className="flex items-center gap-3 text-secondary font-medium uppercase tracking-widest text-[10px] mb-6">
-                  <Calendar className="w-4 h-4 text-primary" />
-                  <span>{new Date(selectedNews.created_at).toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' })}</span>
+              <div className="p-8 md:p-12 font-main">
+                <div className="flex flex-wrap items-center justify-between gap-4 mb-6 pb-6 border-b border-primary/10">
+                  <div className="flex items-center gap-3 text-secondary font-medium uppercase tracking-widest text-[10px]">
+                    <Calendar className="w-4 h-4 text-primary" />
+                    <span>{new Date(selectedNews.created_at).toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' })}</span>
+                  </div>
+
+                  <button
+                    id="listen-news-btn"
+                    onClick={() => {
+                      if ('speechSynthesis' in window) {
+                        window.speechSynthesis.cancel();
+                        const cleanContent = stripHtml(selectedNews.content);
+                        const utterance = new SpeechSynthesisUtterance(
+                          `${selectedNews.title}. Categoria: ${selectedNews.category}. Conteúdo da notícia: ${cleanContent}`
+                        );
+                        utterance.lang = 'pt-BR';
+                        const voices = window.speechSynthesis.getVoices();
+                        const ptVoice = voices.find(v => v.lang.includes('pt-BR') || v.lang.includes('pt_BR'));
+                        if (ptVoice) utterance.voice = ptVoice;
+                        window.speechSynthesis.speak(utterance);
+                        toast.success('Iniciando leitura por áudio da notícia completa.', { id: 'news-audio' });
+                      } else {
+                        toast.error('Navegador não suporta síntese de voz.');
+                      }
+                    }}
+                    className="flex items-center gap-2 px-4 py-2 bg-primary/10 hover:bg-primary/15 text-primary rounded-xl font-bold text-xs uppercase tracking-wider transition-all"
+                    title="Ouvir esta notícia completa em áudio"
+                  >
+                    <Volume2 className="w-4 h-4" />
+                    Ouvir Notícia
+                  </button>
                 </div>
                 
                 <h1 className="text-3xl md:text-5xl font-black text-on-surface font-headline leading-tight mb-8">
@@ -3294,6 +3328,37 @@ export default function App() {
               </span>
             </a>
           ))}
+        </div>
+
+        {/* Ouvidoria ITERAIMA Card */}
+        <div id="acc-ouvidoria-box" className="w-full max-w-xl p-6 rounded-[2rem] bg-[#f2faf3] border border-[#00640f]/15 hover:border-[#00640f]/30 transition-all mb-4 text-center">
+          <div className="flex items-center justify-center gap-2 mb-2">
+            <span className="w-2 h-2 rounded-full bg-[#0a8019] animate-pulse" />
+            <h4 className="text-xs font-headline font-black text-[#00640f] uppercase tracking-widest">Ouvidoria ITERAIMA</h4>
+          </div>
+          <p className="text-[10px] text-secondary font-medium mb-4 max-w-md mx-auto leading-relaxed">
+            Canal direto para denúncias, solicitações, sugestões, reclamações e elogios. Clique nos botões abaixo para falar imediatamente com a nossa equipe.
+          </p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <a 
+              href="https://wa.me/5595991773573" 
+              target="_blank" 
+              rel="noopener noreferrer"
+              className="flex items-center justify-center gap-2.5 px-4 py-3 rounded-2xl bg-[#25d366] hover:bg-[#20ba5a] text-white font-bold text-xs uppercase tracking-wider shadow-sm hover:scale-[1.01] transition-all active:scale-95 duration-100"
+              title="Falar com a Ouvidoria por WhatsApp"
+            >
+              <MessageCircle className="w-4 h-4" />
+              WhatsApp: (95) 99177-3573
+            </a>
+            <a 
+              href="mailto:ouvidoriaiteraima@gmail.com"
+              className="flex items-center justify-center gap-2.5 px-4 py-3 rounded-2xl bg-[#00640f] hover:bg-[#004e0b] text-white font-bold text-xs uppercase tracking-wider shadow-sm hover:scale-[1.01] transition-all active:scale-95 duration-100"
+              title="Mandar e-mail para ouvidoriaiteraima@gmail.com"
+            >
+              <Mail className="w-4 h-4" />
+              ouvidoriaiteraima@gmail.com
+            </a>
+          </div>
         </div>
 
         <div className="flex flex-col gap-4 mb-6">

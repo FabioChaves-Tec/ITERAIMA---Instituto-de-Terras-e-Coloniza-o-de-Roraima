@@ -1,5 +1,6 @@
 {
   "name": "Remix: ITERAIMA - Instituto de Terras e Colonização de Roraima",
-  "description": "Portal oficial do Instituto de Terras e Colonização de Roraima, focado em regularização fundiária e serviços ao produtor.",
-  "requestFramePermissions": []
+  "description": "Portal oficial do Instituto de Terras e Colonização de Roraima, focado em regularização fundiária, com ferramentas completas de acessibilidade em áudio, contraste, atalhos de teclado e tradução em LIBRAS.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }
