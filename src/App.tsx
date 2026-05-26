@@ -152,7 +152,17 @@ export default function App() {
   const [documents, setDocuments] = useState<TransparencyDocument[]>([]);
   const [isUploadingDocs, setIsUploadingDocs] = useState(false);
   const [uploadCategory, setUploadCategory] = useState('BALANÇO FINANCEIRO');
-  const [uploadYear, setUploadYear] = useState('2026');
+  const [availableYears, setAvailableYears] = useState<string[]>(() => {
+    const saved = localStorage.getItem('iteraima_years');
+    return saved ? JSON.parse(saved) : ['2022', '2023', '2024', '2025', '2026'];
+  });
+  const [uploadYear, setUploadYear] = useState(() => {
+    const saved = localStorage.getItem('iteraima_years');
+    const years = saved ? JSON.parse(saved) : ['2022', '2023', '2024', '2025', '2026'];
+    const sorted = [...years].sort((a, b) => b.localeCompare(a));
+    return sorted[0] || '2026';
+  });
+  const [newYearInput, setNewYearInput] = useState('');
   const [uploadMonth, setUploadMonth] = useState('JANEIRO');
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   
@@ -558,6 +568,41 @@ export default function App() {
     setNewImageFile(null);
   };
 
+  const handleAddYearFolder = () => {
+    const trimmed = newYearInput.trim();
+    if (!trimmed) {
+      toast.error('Por favor, informe o ano.');
+      return;
+    }
+    if (!/^\d{4}$/.test(trimmed)) {
+      toast.error('O ano deve conter exatamente 4 números.');
+      return;
+    }
+    if (availableYears.includes(trimmed)) {
+      toast.error('Esta pasta de ano já existe.');
+      return;
+    }
+    const nextYears = [...availableYears, trimmed].sort((a, b) => b.localeCompare(a));
+    setAvailableYears(nextYears);
+    localStorage.setItem('iteraima_years', JSON.stringify(nextYears));
+    setNewYearInput('');
+    toast.success(`Pasta do ano ${trimmed} criada com sucesso em todas as seções do Portal!`);
+  };
+
+  const handleRemoveYearFolder = (yr: string) => {
+    if (availableYears.length <= 1) {
+      toast.error('O sistema precisa de pelo menos uma pasta de ano ativa.');
+      return;
+    }
+    const confirmed = window.confirm(`Deseja realmente remover a pasta do ano ${yr}? Os documentos salvos com este ano continuarão no banco de dados, mas a pasta não aparecerá na navegação.`);
+    if (!confirmed) return;
+
+    const nextYears = availableYears.filter(y => y !== yr);
+    setAvailableYears(nextYears);
+    localStorage.setItem('iteraima_years', JSON.stringify(nextYears));
+    toast.success(`Pasta do ano ${yr} removida.`);
+  };
+
   const handleDeleteNews = async (id: any) => {
     try {
       await api.deleteNews(id);
@@ -680,17 +725,23 @@ export default function App() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
+  const getBasicYears = () => {
+    return [...availableYears].sort((a, b) => b.localeCompare(a)).map(y => ({ label: y, icon: Calendar }));
+  };
+
+  const getMonthlyYears = () => {
+    return [...availableYears].sort((a, b) => b.localeCompare(a)).map(y => ({ 
+      label: y, 
+      icon: Calendar,
+      subItems: MONTHS.map(m => ({ label: m, icon: Clock }))
+    }));
+  };
+
   const transparenciaItems = [
     { 
       label: 'ACORDO DE COOPERAÇÃO TÉCNICA', 
       icon: Handshake,
-      subItems: [
-        { label: '2026', icon: Calendar },
-        { label: '2025', icon: Calendar },
-        { label: '2024', icon: Calendar },
-        { label: '2023', icon: Calendar },
-        { label: '2022', icon: Calendar }
-      ]
+      subItems: getBasicYears()
     },
     { 
       label: 'FINANCEIRA', 
@@ -699,35 +750,17 @@ export default function App() {
         { 
           label: 'BALANÇO FINANCEIRO', 
           icon: FileText,
-          subItems: [
-            { label: '2022', icon: Calendar },
-            { label: '2023', icon: Calendar },
-            { label: '2024', icon: Calendar },
-            { label: '2025', icon: Calendar },
-            { label: '2026', icon: Calendar }
-          ]
+          subItems: getBasicYears()
         },
         { 
           label: 'CONTRATAÇÃO DIRETA', 
           icon: Handshake,
-          subItems: [
-            { label: '2022', icon: Calendar },
-            { label: '2023', icon: Calendar },
-            { label: '2024', icon: Calendar },
-            { label: '2025', icon: Calendar },
-            { label: '2026', icon: Calendar }
-          ]
+          subItems: getBasicYears()
         },
         { 
           label: 'CONTRATOS E ADITIVOS', 
           icon: FileSignature,
-          subItems: [
-            { label: '2022', icon: Calendar },
-            { label: '2023', icon: Calendar },
-            { label: '2024', icon: Calendar },
-            { label: '2025', icon: Calendar },
-            { label: '2026', icon: Calendar }
-          ]
+          subItems: getBasicYears()
         },
         { 
           label: 'COSLIC', 
@@ -736,103 +769,49 @@ export default function App() {
             { 
               label: 'AVISO', 
               icon: FileText,
-              subItems: [
-                { label: '2022', icon: Calendar },
-                { label: '2023', icon: Calendar },
-                { label: '2024', icon: Calendar },
-                { label: '2025', icon: Calendar },
-                { label: '2026', icon: Calendar }
-              ]
+              subItems: getBasicYears()
             },
             { 
               label: 'COMUNICADO', 
               icon: FileText,
-              subItems: [
-                { label: '2022', icon: Calendar },
-                { label: '2023', icon: Calendar },
-                { label: '2024', icon: Calendar },
-                { label: '2025', icon: Calendar },
-                { label: '2026', icon: Calendar }
-              ]
+              subItems: getBasicYears()
             },
             { 
               label: 'DISPENSA', 
               icon: FileText,
-              subItems: [
-                { label: '2022', icon: Calendar },
-                { label: '2023', icon: Calendar },
-                { label: '2024', icon: Calendar },
-                { label: '2025', icon: Calendar },
-                { label: '2026', icon: Calendar }
-              ]
+              subItems: getBasicYears()
             },
             { 
               label: 'EDITAIS', 
               icon: FileText,
-              subItems: [
-                { label: '2022', icon: Calendar },
-                { label: '2023', icon: Calendar },
-                { label: '2024', icon: Calendar },
-                { label: '2025', icon: Calendar },
-                { label: '2026', icon: Calendar }
-              ]
+              subItems: getBasicYears()
             },
             { 
               label: 'INEXIGIBILIDADE', 
               icon: FileText,
-              subItems: [
-                { label: '2022', icon: Calendar },
-                { label: '2023', icon: Calendar },
-                { label: '2024', icon: Calendar },
-                { label: '2025', icon: Calendar },
-                { label: '2026', icon: Calendar }
-              ]
+              subItems: getBasicYears()
             },
             { 
               label: 'RESULTADO', 
               icon: FileText,
-              subItems: [
-                { label: '2022', icon: Calendar },
-                { label: '2023', icon: Calendar },
-                { label: '2024', icon: Calendar },
-                { label: '2025', icon: Calendar },
-                { label: '2026', icon: Calendar }
-              ]
+              subItems: getBasicYears()
             },
             { 
               label: 'SÍNTESE', 
               icon: FileText,
-              subItems: [
-                { label: '2022', icon: Calendar },
-                { label: '2023', icon: Calendar },
-                { label: '2024', icon: Calendar },
-                { label: '2025', icon: Calendar },
-                { label: '2026', icon: Calendar }
-              ]
+              subItems: getBasicYears()
             },
             { 
               label: 'ATA DE REGISTRO DE PREÇOS', 
               icon: FileText,
-              subItems: [
-                { label: '2022', icon: Calendar },
-                { label: '2023', icon: Calendar },
-                { label: '2024', icon: Calendar },
-                { label: '2025', icon: Calendar },
-                { label: '2026', icon: Calendar }
-              ]
+              subItems: getBasicYears()
             }
           ]
         },
         { 
           label: 'PLANO DE CONTRATAÇÃO ANUAL – PCA', 
           icon: Calendar,
-          subItems: [
-            { label: '2022', icon: Calendar },
-            { label: '2023', icon: Calendar },
-            { label: '2024', icon: Calendar },
-            { label: '2025', icon: Calendar },
-            { label: '2026', icon: Calendar }
-          ]
+          subItems: getBasicYears()
         }
       ]
     },
@@ -843,46 +822,22 @@ export default function App() {
         { 
           label: 'IMÓVEIS', 
           icon: Home,
-          subItems: [
-            { label: '2026', icon: Calendar },
-            { label: '2025', icon: Calendar },
-            { label: '2024', icon: Calendar },
-            { label: '2023', icon: Calendar },
-            { label: '2022', icon: Calendar }
-          ]
+          subItems: getBasicYears()
         },
         { 
           label: 'REGULARIZADOS', 
           icon: FileSignature,
-          subItems: [
-            { label: '2026', icon: Calendar },
-            { label: '2025', icon: Calendar },
-            { label: '2024', icon: Calendar },
-            { label: '2023', icon: Calendar },
-            { label: '2022', icon: Calendar }
-          ]
+          subItems: getBasicYears()
         },
         { 
           label: 'NOTIFICAÇÕES', 
           icon: Rss,
-          subItems: [
-            { label: '2026', icon: Calendar },
-            { label: '2025', icon: Calendar },
-            { label: '2024', icon: Calendar },
-            { label: '2023', icon: Calendar },
-            { label: '2022', icon: Calendar }
-          ]
+          subItems: getBasicYears()
         },
         { 
           label: 'REQUERIMENTO DE REGULARIZAÇÃO', 
           icon: ClipboardList,
-          subItems: [
-            { label: '2026', icon: Calendar },
-            { label: '2025', icon: Calendar },
-            { label: '2024', icon: Calendar },
-            { label: '2023', icon: Calendar },
-            { label: '2022', icon: Calendar }
-          ]
+          subItems: getBasicYears()
         }
       ]
     },
@@ -893,117 +848,27 @@ export default function App() {
         { 
           label: 'CONCURSOS E SELEÇÕES', 
           icon: UsersRound,
-          subItems: [
-            { label: '2026', icon: Calendar },
-            { label: '2025', icon: Calendar },
-            { label: '2024', icon: Calendar },
-            { label: '2023', icon: Calendar },
-            { label: '2022', icon: Calendar }
-          ]
+          subItems: getBasicYears()
         },
         { 
           label: 'DIÁRIAS', 
           icon: CircleDollarSign,
-          subItems: [
-            { label: '2026', icon: Calendar },
-            { label: '2025', icon: Calendar },
-            { label: '2024', icon: Calendar },
-            { label: '2023', icon: Calendar },
-            { label: '2022', icon: Calendar }
-          ]
+          subItems: getBasicYears()
         },
         { 
           label: 'ESTAGIÁRIOS', 
           icon: UserRound,
-          subItems: [
-            { 
-              label: '2026', 
-              icon: Calendar,
-              subItems: MONTHS.map(m => ({ label: m, icon: Clock }))
-            },
-            { 
-              label: '2025', 
-              icon: Calendar,
-              subItems: MONTHS.map(m => ({ label: m, icon: Clock }))
-            },
-            { 
-              label: '2024', 
-              icon: Calendar,
-              subItems: MONTHS.map(m => ({ label: m, icon: Clock }))
-            },
-            { 
-              label: '2023', 
-              icon: Calendar,
-              subItems: MONTHS.map(m => ({ label: m, icon: Clock }))
-            },
-            { 
-              label: '2022', 
-              icon: Calendar,
-              subItems: MONTHS.map(m => ({ label: m, icon: Clock }))
-            }
-          ]
+          subItems: getMonthlyYears()
         },
         { 
           label: 'FOLHA DE PAGAMENTO', 
           icon: FileText,
-          subItems: [
-            { 
-              label: '2026', 
-              icon: Calendar,
-              subItems: MONTHS.map(m => ({ label: m, icon: Clock }))
-            },
-            { 
-              label: '2025', 
-              icon: Calendar,
-              subItems: MONTHS.map(m => ({ label: m, icon: Clock }))
-            },
-            { 
-              label: '2024', 
-              icon: Calendar,
-              subItems: MONTHS.map(m => ({ label: m, icon: Clock }))
-            },
-            { 
-              label: '2023', 
-              icon: Calendar,
-              subItems: MONTHS.map(m => ({ label: m, icon: Clock }))
-            },
-            { 
-              label: '2022', 
-              icon: Calendar,
-              subItems: MONTHS.map(m => ({ label: m, icon: Clock }))
-            }
-          ]
+          subItems: getMonthlyYears()
         },
         { 
           label: 'TERCEIRIZADOS', 
           icon: Handshake,
-          subItems: [
-            { 
-              label: '2026', 
-              icon: Calendar,
-              subItems: MONTHS.map(m => ({ label: m, icon: Clock }))
-            },
-            { 
-              label: '2025', 
-              icon: Calendar,
-              subItems: MONTHS.map(m => ({ label: m, icon: Clock }))
-            },
-            { 
-              label: '2024', 
-              icon: Calendar,
-              subItems: MONTHS.map(m => ({ label: m, icon: Clock }))
-            },
-            { 
-              label: '2023', 
-              icon: Calendar,
-              subItems: MONTHS.map(m => ({ label: m, icon: Clock }))
-            },
-            { 
-              label: '2022', 
-              icon: Calendar,
-              subItems: MONTHS.map(m => ({ label: m, icon: Clock }))
-            }
-          ]
+          subItems: getMonthlyYears()
         }
       ]
     }
@@ -1026,13 +891,7 @@ export default function App() {
     { 
       label: 'ADMINISTRATIVA', 
       icon: Scale,
-      subItems: [
-        { label: '2026', icon: Calendar },
-        { label: '2025', icon: Calendar },
-        { label: '2024', icon: Calendar },
-        { label: '2023', icon: Calendar },
-        { label: '2022', icon: Calendar }
-      ]
+      subItems: getBasicYears()
     },
     { 
       label: 'FUNDIÁRIA', 
@@ -1041,37 +900,19 @@ export default function App() {
         { 
           label: 'LEI VIGENTE', 
           icon: ShieldCheck,
-          subItems: [
-            { label: '2026', icon: Calendar },
-            { label: '2025', icon: Calendar },
-            { label: '2024', icon: Calendar },
-            { label: '2023', icon: Calendar },
-            { label: '2022', icon: Calendar }
-          ]
+          subItems: getBasicYears()
         },
         { 
           label: 'LEI NÃO VIGENTE', 
           icon: ShieldAlert,
-          subItems: [
-            { label: '2026', icon: Calendar },
-            { label: '2025', icon: Calendar },
-            { label: '2024', icon: Calendar },
-            { label: '2023', icon: Calendar },
-            { label: '2022', icon: Calendar }
-          ]
+          subItems: getBasicYears()
         }
       ]
     },
     { 
       label: 'MODELOS DE REQUERIMENTOS', 
       icon: FileSignature,
-      subItems: [
-        { label: '2026', icon: Calendar },
-        { label: '2025', icon: Calendar },
-        { label: '2024', icon: Calendar },
-        { label: '2023', icon: Calendar },
-        { label: '2022', icon: Calendar }
-      ]
+      subItems: getBasicYears()
     }
   ];
 
@@ -2667,7 +2508,8 @@ export default function App() {
                 )}
 
                 {adminTab === 'documents' && (
-                  <div className="bg-white p-8 rounded-3xl shadow-xl border border-primary/5 space-y-8">
+                  <div className="space-y-8">
+                    <div className="bg-white p-8 rounded-3xl shadow-xl border border-primary/5 space-y-8">
                     <div className="flex items-center gap-4 mb-4">
                       <div className="w-12 h-12 bg-primary/10 rounded-2xl flex items-center justify-center text-primary">
                         <Upload className="w-6 h-6" />
@@ -2700,7 +2542,7 @@ export default function App() {
                               onChange={(e) => setUploadYear(e.target.value)}
                               className="w-full bg-surface-container-low border-none rounded-2xl px-4 py-3 text-sm focus:ring-2 focus:ring-primary transition-all"
                             >
-                              {['2022', '2023', '2024', '2025', '2026'].map(y => (
+                              {[...availableYears].sort((a, b) => b.localeCompare(a)).map(y => (
                                 <option key={y} value={y}>{y}</option>
                               ))}
                             </select>
@@ -2782,7 +2624,77 @@ export default function App() {
                       </button>
                     </div>
                   </div>
-                )}
+
+                  {/* Gerenciamento de Pastas de Anos */}
+                  <div className="bg-white p-8 rounded-3xl shadow-xl border border-primary/5 space-y-6">
+                    <div className="flex items-center gap-4">
+                      <div className="w-12 h-12 bg-primary/10 rounded-2xl flex items-center justify-center text-primary">
+                        <Folder className="w-6 h-6" />
+                      </div>
+                      <div>
+                        <h3 className="text-2xl font-black text-on-surface font-headline leading-none">Gerenciar Pastas de Anos</h3>
+                        <p className="text-xs text-secondary mt-1">Adicione ou remova pastas de anos do Portal da Transparência e Legislação</p>
+                      </div>
+                    </div>
+
+                    <div className="p-4 bg-primary/5 rounded-2xl flex items-start gap-4 border border-primary/10">
+                      <span className="w-2 h-2 rounded-full bg-primary mt-1.5 shrink-0 animate-pulse" />
+                      <p className="text-xs text-secondary leading-relaxed">
+                        Ao adicionar um ano aqui, uma nova pasta será <strong>criada automaticamente</strong> em todas as categorias do Portal da Transparência, Legislação Administrativa, Legislação Fundiária e Modelos de Requerimentos. A nova pasta de ano aparecerá tanto na navegação geral para os cidadãos quanto nas opções de upload de documentos para os gestores.
+                      </p>
+                    </div>
+
+                    <div className="grid md:grid-cols-2 gap-8 items-start">
+                      {/* Formulário de Adição */}
+                      <div className="space-y-4">
+                        <div>
+                          <label className="block text-[10px] font-bold text-secondary uppercase tracking-widest mb-1.5 ml-1">Criar Nova Pasta de Ano</label>
+                          <div className="flex gap-2">
+                            <input 
+                              type="text"
+                              maxLength={4}
+                              placeholder="Digite o ano (Ex: 2027)"
+                              value={newYearInput}
+                              onChange={(e) => setNewYearInput(e.target.value.replace(/\D/g, ''))}
+                              className="flex-1 bg-surface-container-low border-none rounded-2xl px-4 py-3 text-sm focus:ring-2 focus:ring-primary transition-all font-bold placeholder:font-normal"
+                            />
+                            <button
+                              onClick={handleAddYearFolder}
+                              className="bg-primary hover:bg-primary/90 text-white font-bold px-5 py-3 rounded-2xl shadow-lg shadow-primary/20 hover:scale-[1.02] active:scale-95 duration-100 transition-all flex items-center gap-2 text-xs uppercase tracking-wider"
+                            >
+                              <Plus className="w-4 h-4" />
+                              Criar Pasta
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Lista de Pastas Ativas */}
+                      <div className="space-y-3">
+                        <span className="block text-[10px] font-bold text-secondary uppercase tracking-widest ml-1">Pastas de Ano Ativas</span>
+                        <div className="flex flex-wrap gap-2.5 max-h-48 overflow-y-auto p-1">
+                          {[...availableYears].sort((a, b) => b.localeCompare(a)).map((yr) => (
+                            <div 
+                              key={yr} 
+                              className="flex items-center gap-2 bg-surface-container-low border border-primary/5 px-4 py-2.5 rounded-xl hover:border-primary/15 transition-all text-sm font-bold text-on-surface group"
+                            >
+                              <Folder className="w-4 h-4 text-primary opacity-75" />
+                              <span>{yr}</span>
+                              <button 
+                                onClick={() => handleRemoveYearFolder(yr)}
+                                className="text-red-500 hover:bg-[#ffebec] p-1 rounded-md opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity ml-1"
+                                title={`Remover pasta do ano ${yr}`}
+                              >
+                                <X className="w-3.5 h-3.5 text-red-600" />
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
 
                 {adminTab === 'settings' && (
                   <div className="space-y-8">
