@@ -57,7 +57,7 @@ import {
 import { Toaster, toast } from 'sonner';
 import { motion, AnimatePresence } from 'motion/react';
 import React, { useState, useEffect, FormEvent } from 'react';
-import { api, User, News, TransparencyDocument, Presidencia, Diretoria, GaleriaPresidente } from './api';
+import { api, User, News, TransparencyDocument, Presidencia, Diretoria, GaleriaPresidente, MenuNode } from './api';
 import { AccessibilityPanel } from './components/AccessibilityPanel';
 const AiAssistant = React.lazy(() => import('./components/AiAssistant').then(m => ({ default: m.AiAssistant })));
 
@@ -67,14 +67,6 @@ const IMAGES = {
   news1: 'https://images.unsplash.com/photo-1450101499163-c8848c66ca85?auto=format&fit=crop&q=80&w=800',
   news2: 'https://images.unsplash.com/photo-1500382017468-9049fed747ef?auto=format&fit=crop&q=80&w=800',
 };
-
-interface MenuNode {
-  id: string;
-  label: string;
-  iconName: string;
-  type: 'years' | 'months' | 'parent';
-  subItems?: MenuNode[];
-}
 
 const DEFAULT_TRANSPARENCIA_NODES: MenuNode[] = [
   {
@@ -366,7 +358,7 @@ export default function App() {
     // Initial data fetch
     const fetchData = async () => {
       try {
-        const [news, docs, cover, logo, favicon, pres, dir, gal] = await Promise.all([
+        const [news, docs, cover, logo, favicon, pres, dir, gal, menuNodes] = await Promise.all([
           api.getNews(),
           api.getDocuments(),
           api.getCoverPhoto(),
@@ -374,7 +366,11 @@ export default function App() {
           api.getFavicon(),
           api.getPresidencia(),
           api.getDiretorias(),
-          api.getGaleria()
+          api.getGaleria(),
+          api.getMenuNodes().catch(err => {
+            console.warn("Failed to load database menu nodes, falling back:", err);
+            return { transparencia: [], legislacao: [] };
+          })
         ]);
         setNewsList(news);
         setDocuments(docs);
@@ -384,6 +380,15 @@ export default function App() {
         setPresidencia(pres);
         setDiretorias(dir);
         setGaleria(gal);
+        
+        if (menuNodes && menuNodes.transparencia && menuNodes.transparencia.length > 0) {
+          setTransparenciaNodes(menuNodes.transparencia);
+          localStorage.setItem('iteraima_transparencia_nodes', JSON.stringify(menuNodes.transparencia));
+        }
+        if (menuNodes && menuNodes.legislacao && menuNodes.legislacao.length > 0) {
+          setLegislacaoNodes(menuNodes.legislacao);
+          localStorage.setItem('iteraima_legislacao_nodes', JSON.stringify(menuNodes.legislacao));
+        }
       } catch (error) {
         console.error("Error fetching initial data:", error);
       } finally {
@@ -788,10 +793,18 @@ export default function App() {
       const updated = addNodeToTree(transparenciaNodes, showAddNodeForm.parentId, newNode);
       setTransparenciaNodes(updated);
       localStorage.setItem('iteraima_transparencia_nodes', JSON.stringify(updated));
+      api.updateMenuNodes(updated, legislacaoNodes).catch(err => {
+        console.error("Erro ao salvar no banco:", err);
+        toast.error("Erro ao salvar as alterações no servidor.");
+      });
     } else {
       const updated = addNodeToTree(legislacaoNodes, showAddNodeForm.parentId, newNode);
       setLegislacaoNodes(updated);
       localStorage.setItem('iteraima_legislacao_nodes', JSON.stringify(updated));
+      api.updateMenuNodes(transparenciaNodes, updated).catch(err => {
+        console.error("Erro ao salvar no banco:", err);
+        toast.error("Erro ao salvar as alterações no servidor.");
+      });
     }
 
     toast.success(`"${uppercaseLabel}" adicionado com sucesso!`);
@@ -807,10 +820,18 @@ export default function App() {
         const updated = removeNodeFromTree(transparenciaNodes, id);
         setTransparenciaNodes(updated);
         localStorage.setItem('iteraima_transparencia_nodes', JSON.stringify(updated));
+        api.updateMenuNodes(updated, legislacaoNodes).catch(err => {
+          console.error("Erro ao salvar no banco:", err);
+          toast.error("Erro ao salvar as alterações no servidor.");
+        });
       } else {
         const updated = removeNodeFromTree(legislacaoNodes, id);
         setLegislacaoNodes(updated);
         localStorage.setItem('iteraima_legislacao_nodes', JSON.stringify(updated));
+        api.updateMenuNodes(transparenciaNodes, updated).catch(err => {
+          console.error("Erro ao salvar no banco:", err);
+          toast.error("Erro ao salvar as alterações no servidor.");
+        });
       }
       toast.success(`"${label}" removido com sucesso.`);
     }

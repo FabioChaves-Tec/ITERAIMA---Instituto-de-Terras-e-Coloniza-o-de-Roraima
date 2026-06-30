@@ -316,6 +316,51 @@ async function startServer() {
     }
   });
 
+  // Menu Nodes (Transparency & Legislation Categories)
+  app.get("/api/settings/menu_nodes", async (req, res) => {
+    try {
+      const { rows } = await pool.query("SELECT key, value FROM settings WHERE key IN ('transparencia_nodes', 'legislacao_nodes')");
+      const result: { transparencia: any[], legislacao: any[] } = {
+        transparencia: [],
+        legislacao: []
+      };
+      rows.forEach(row => {
+        if (row.key === 'transparencia_nodes') {
+          try {
+            result.transparencia = JSON.parse(row.value);
+          } catch (e) {
+            result.transparencia = [];
+          }
+        } else if (row.key === 'legislacao_nodes') {
+          try {
+            result.legislacao = JSON.parse(row.value);
+          } catch (e) {
+            result.legislacao = [];
+          }
+        }
+      });
+      res.json(result);
+    } catch (err) {
+      res.status(500).json({ message: "Erro ao buscar categorias do menu" });
+    }
+  });
+
+  app.post("/api/settings/menu_nodes", authenticateToken, async (req: any, res) => {
+    if (req.user.role !== 'admin' && req.user.role !== 'editor') return res.sendStatus(403);
+    const { transparencia, legislacao } = req.body;
+    try {
+      if (transparencia) {
+        await pool.query("INSERT INTO settings (key, value) VALUES ('transparencia_nodes', $1) ON CONFLICT (key) DO UPDATE SET value = $1", [JSON.stringify(transparencia)]);
+      }
+      if (legislacao) {
+        await pool.query("INSERT INTO settings (key, value) VALUES ('legislacao_nodes', $1) ON CONFLICT (key) DO UPDATE SET value = $1", [JSON.stringify(legislacao)]);
+      }
+      res.json({ message: "Categorias do menu atualizadas com sucesso" });
+    } catch (err) {
+      res.status(500).json({ message: "Erro ao atualizar categorias do menu" });
+    }
+  });
+
   // Presidencia
   app.get("/api/presidencia", async (req, res) => {
     try {
