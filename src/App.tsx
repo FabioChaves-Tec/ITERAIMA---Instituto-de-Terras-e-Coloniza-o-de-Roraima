@@ -93,8 +93,8 @@ const transparencyCategories = [
   'ADMINISTRATIVA',
   'FUNDIÁRIA',
   'MODELOS DE REQUERIMENTOS',
-  'LEI VIGENTE',
-  'LEI NÃO VIGENTE',
+  'RURAL',
+  'URBANA',
   'ACORDO DE COOPERAÇÃO TÉCNICA'
 ];
 
@@ -898,12 +898,12 @@ export default function App() {
       icon: FileText,
       subItems: [
         { 
-          label: 'LEI VIGENTE', 
+          label: 'RURAL', 
           icon: ShieldCheck,
           subItems: getBasicYears()
         },
         { 
-          label: 'LEI NÃO VIGENTE', 
+          label: 'URBANA', 
           icon: ShieldAlert,
           subItems: getBasicYears()
         }
