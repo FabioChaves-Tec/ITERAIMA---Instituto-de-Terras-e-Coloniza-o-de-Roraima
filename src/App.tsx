@@ -199,6 +199,11 @@ const stripHtml = (html: string) => {
   return doc.body.textContent || "";
 };
 
+const normalizeStr = (str: string | undefined | null) => {
+  if (!str) return "";
+  return str.trim().toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+};
+
 // ITERAIMA Portal - v1.0.3 - Triggering sync refresh
 export default function App() {
   const [showTransparenciaSub, setShowTransparenciaSub] = useState(false);
@@ -215,6 +220,11 @@ export default function App() {
   const [selectedFolder, setSelectedFolder] = useState<{ label: string, items: any[] } | null>(null);
   const [selectedYear, setSelectedYear] = useState<string | null>(null);
   const [selectedMonth, setSelectedMonth] = useState<string | null>(null);
+
+  React.useEffect(() => {
+    setSelectedYear(null);
+    setSelectedMonth(null);
+  }, [selectedFolder]);
   
   // Institutional State
   const [presidencia, setPresidencia] = useState<Presidencia | null>(null);
@@ -2227,9 +2237,9 @@ export default function App() {
                 <div className="grid gap-3">
                   {documents
                     .filter(doc => 
-                      doc.category === selectedFolder.label && 
-                      doc.year === selectedYear &&
-                      (!selectedMonth || doc.month === selectedMonth)
+                      normalizeStr(doc.category) === normalizeStr(selectedFolder.label) && 
+                      normalizeStr(doc.year) === normalizeStr(selectedYear) &&
+                      (!selectedMonth || normalizeStr(doc.month) === normalizeStr(selectedMonth))
                     )
                     .map(doc => (
                       <div key={doc.id} className="bg-white p-4 rounded-2xl border border-primary/5 flex items-center justify-between group hover:border-primary/20 transition-all shadow-sm">
@@ -2266,9 +2276,9 @@ export default function App() {
                       </div>
                     ))}
                   {documents.filter(doc => 
-                    doc.category === selectedFolder.label && 
-                    doc.year === selectedYear &&
-                    (!selectedMonth || doc.month === selectedMonth)
+                    normalizeStr(doc.category) === normalizeStr(selectedFolder.label) && 
+                    normalizeStr(doc.year) === normalizeStr(selectedYear) &&
+                    (!selectedMonth || normalizeStr(doc.month) === normalizeStr(selectedMonth))
                   ).length === 0 && (
                     <div className="text-center py-12 bg-surface-container-low rounded-3xl border border-dashed border-primary/20">
                       <File className="w-12 h-12 mx-auto mb-4 opacity-10 text-primary" />
