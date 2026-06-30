@@ -625,6 +625,26 @@ async function startServer() {
     }
   });
 
+  // Diagnostic Endpoint
+  app.get("/api/diagnostic", async (req, res) => {
+    try {
+      const { rows: docs } = await pool.query("SELECT id, name, category, year, month, url FROM documents ORDER BY id DESC LIMIT 50");
+      const { rows: settings } = await pool.query("SELECT key, value FROM settings WHERE key IN ('transparencia_nodes', 'legislacao_nodes')");
+      res.json({
+        documents: docs,
+        settings: settings.map(row => {
+          try {
+            return { key: row.key, value: JSON.parse(row.value) };
+          } catch(e) {
+            return { key: row.key, error: e };
+          }
+        })
+      });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
   // Documents Routes
   app.get("/api/documents", async (req, res) => {
     try {
