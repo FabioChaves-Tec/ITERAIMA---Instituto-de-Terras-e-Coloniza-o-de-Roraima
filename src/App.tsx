@@ -68,34 +68,118 @@ const IMAGES = {
   news2: 'https://images.unsplash.com/photo-1500382017468-9049fed747ef?auto=format&fit=crop&q=80&w=800',
 };
 
-const transparencyCategories = [
-  'BALANÇO FINANCEIRO',
-  'CONTRATAÇÃO DIRETA',
-  'CONTRATOS E ADITIVOS',
-  'AVISO',
-  'COMUNICADO',
-  'DISPENSA',
-  'EDITAIS',
-  'INEXIGIBILIDADE',
-  'RESULTADO',
-  'SÍNTESE',
-  'ATA DE REGISTRO DE PREÇOS',
-  'PLANO DE CONTRATAÇÃO ANUAL – PCA',
-  'IMÓVEIS',
-  'REGULARIZADOS',
-  'NOTIFICAÇÕES',
-  'REQUERIMENTO DE REGULARIZAÇÃO',
-  'CONCURSOS E SELEÇÕES',
-  'DIÁRIAS',
-  'ESTAGIÁRIOS',
-  'FOLHA DE PAGAMENTO',
-  'TERCEIRIZADOS',
-  'ADMINISTRATIVA',
-  'FUNDIÁRIA',
-  'MODELOS DE REQUERIMENTOS',
-  'RURAL',
-  'URBANA',
-  'ACORDO DE COOPERAÇÃO TÉCNICA'
+interface MenuNode {
+  id: string;
+  label: string;
+  iconName: string;
+  type: 'years' | 'months' | 'parent';
+  subItems?: MenuNode[];
+}
+
+const DEFAULT_TRANSPARENCIA_NODES: MenuNode[] = [
+  {
+    id: 'act',
+    label: 'ACORDO DE COOPERAÇÃO TÉCNICA',
+    iconName: 'Handshake',
+    type: 'years'
+  },
+  {
+    id: 'fin',
+    label: 'FINANCEIRA',
+    iconName: 'CircleDollarSign',
+    type: 'parent',
+    subItems: [
+      { id: 'fin_bal', label: 'BALANÇO FINANCEIRO', iconName: 'FileText', type: 'years' },
+      { id: 'fin_con', label: 'CONTRATAÇÃO DIRETA', iconName: 'Handshake', type: 'years' },
+      { id: 'fin_cta', label: 'CONTRATOS E ADITIVOS', iconName: 'FileSignature', type: 'years' },
+      {
+        id: 'fin_cos',
+        label: 'COSLIC',
+        iconName: 'ClipboardList',
+        type: 'parent',
+        subItems: [
+          { id: 'cos_avi', label: 'AVISO', iconName: 'FileText', type: 'years' },
+          { id: 'cos_com', label: 'COMUNICADO', iconName: 'FileText', type: 'years' },
+          { id: 'cos_dis', label: 'DISPENSA', iconName: 'FileText', type: 'years' },
+          { id: 'cos_edi', label: 'EDITAIS', iconName: 'FileText', type: 'years' },
+          { id: 'cos_ine', label: 'INEXIGIBILIDADE', iconName: 'FileText', type: 'years' },
+          { id: 'cos_res', label: 'RESULTADO', iconName: 'FileText', type: 'years' },
+          { id: 'cos_sin', label: 'SÍNTESE', iconName: 'FileText', type: 'years' },
+          { id: 'cos_ata', label: 'ATA DE REGISTRO DE PREÇOS', iconName: 'FileText', type: 'years' }
+        ]
+      },
+      { id: 'fin_pca', label: 'PLANO DE CONTRATAÇÃO ANUAL – PCA', iconName: 'Calendar', type: 'years' }
+    ]
+  },
+  {
+    id: 'fun',
+    label: 'FUNDIÁRIA',
+    iconName: 'Map',
+    type: 'parent',
+    subItems: [
+      { id: 'fun_imo', label: 'IMÓVEIS', iconName: 'Home', type: 'years' },
+      { id: 'fun_reg', label: 'REGULARIZADOS', iconName: 'FileSignature', type: 'years' },
+      { id: 'fun_not', label: 'NOTIFICAÇÕES', iconName: 'Rss', type: 'years' },
+      { id: 'fun_req', label: 'REQUERIMENTO DE REGULARIZAÇÃO', iconName: 'ClipboardList', type: 'years' }
+    ]
+  },
+  {
+    id: 'pes',
+    label: 'DE PESSOAS',
+    iconName: 'Users',
+    type: 'parent',
+    subItems: [
+      { id: 'pes_con', label: 'CONCURSOS E SELEÇÕES', iconName: 'UsersRound', type: 'years' },
+      { id: 'pes_dia', label: 'DIÁRIAS', iconName: 'CircleDollarSign', type: 'years' },
+      { id: 'pes_est', label: 'ESTAGIÁRIOS', iconName: 'UserRound', type: 'months' },
+      { id: 'pes_fol', label: 'FOLHA DE PAGAMENTO', iconName: 'FileText', type: 'months' },
+      { id: 'pes_ter', label: 'TERCEIRIZADOS', iconName: 'Handshake', type: 'months' }
+    ]
+  }
+];
+
+const DEFAULT_LEGISLACAO_NODES: MenuNode[] = [
+  {
+    id: 'leg_adm',
+    label: 'ADMINISTRATIVA',
+    iconName: 'Scale',
+    type: 'years'
+  },
+  {
+    id: 'leg_fun',
+    label: 'FUNDIÁRIA',
+    iconName: 'FileText',
+    type: 'parent',
+    subItems: [
+      { id: 'leg_fun_rur', label: 'RURAL', iconName: 'ShieldCheck', type: 'years' },
+      { id: 'leg_fun_urb', label: 'URBANA', iconName: 'ShieldAlert', type: 'years' }
+    ]
+  },
+  {
+    id: 'leg_mod',
+    label: 'MODELOS DE REQUERIMENTOS',
+    iconName: 'FileSignature',
+    type: 'years'
+  }
+];
+
+const availableIconsForSelection = [
+  { name: 'FileText', label: 'Documento (Texto)', icon: FileText },
+  { name: 'Scale', label: 'Balança (Lei/Justiça)', icon: Scale },
+  { name: 'Handshake', label: 'Aperto de Mãos (Contratos/Acordos)', icon: Handshake },
+  { name: 'CircleDollarSign', label: 'Moeda/Dinheiro (Financeiro)', icon: CircleDollarSign },
+  { name: 'ClipboardList', label: 'Prancheta/Lista (Processos/Requerimentos)', icon: ClipboardList },
+  { name: 'Map', label: 'Mapa (Fundiário)', icon: Map },
+  { name: 'Home', label: 'Casa (Imóveis/Habitação)', icon: Home },
+  { name: 'FileSignature', label: 'Assinatura (Contratos/Avisos)', icon: FileSignature },
+  { name: 'Rss', label: 'Sinal/Notificações (Editais)', icon: Rss },
+  { name: 'Users', label: 'Pessoas (Equipe/Pessoas)', icon: Users },
+  { name: 'UsersRound', label: 'Grupo de Pessoas', icon: UsersRound },
+  { name: 'UserRound', label: 'Pessoa Única', icon: UserRound },
+  { name: 'ShieldCheck', label: 'Escudo Visto (Vigente/Seguro)', icon: ShieldCheck },
+  { name: 'ShieldAlert', label: 'Escudo Alerta (Não Vigente/Restrição)', icon: ShieldAlert },
+  { name: 'Calendar', label: 'Calendário', icon: Calendar },
+  { name: 'Clock', label: 'Relógio/Período', icon: Clock }
 ];
 
 const MONTHS = [
@@ -149,9 +233,53 @@ export default function App() {
   const [isLoading, setIsLoading] = useState(true);
   
   // Transparency Documents State
+  const [transparenciaNodes, setTransparenciaNodes] = useState<MenuNode[]>(() => {
+    const saved = localStorage.getItem('iteraima_transparencia_nodes');
+    return saved ? JSON.parse(saved) : DEFAULT_TRANSPARENCIA_NODES;
+  });
+
+  const [legislacaoNodes, setLegislacaoNodes] = useState<MenuNode[]>(() => {
+    const saved = localStorage.getItem('iteraima_legislacao_nodes');
+    return saved ? JSON.parse(saved) : DEFAULT_LEGISLACAO_NODES;
+  });
+
+  const [showAddNodeForm, setShowAddNodeForm] = useState<{
+    treeType: 'transparencia' | 'legislacao';
+    parentId: string | null;
+    parentLabel: string;
+  } | null>(null);
+
+  const [newNodeLabel, setNewNodeLabel] = useState('');
+  const [newNodeIcon, setNewNodeIcon] = useState('FileText');
+  const [newNodeType, setNewNodeType] = useState<'years' | 'months' | 'parent'>('years');
+
+  const getLeafCategoryLabels = (nodes: MenuNode[]): string[] => {
+    const labels: string[] = [];
+    const traverse = (node: MenuNode) => {
+      if (node.type === 'years' || node.type === 'months') {
+        labels.push(node.label);
+      } else if (node.subItems) {
+        node.subItems.forEach(traverse);
+      }
+    };
+    nodes.forEach(traverse);
+    return labels;
+  };
+
+  const activeTransparencyCategories = [
+    ...getLeafCategoryLabels(transparenciaNodes),
+    ...getLeafCategoryLabels(legislacaoNodes)
+  ];
+
   const [documents, setDocuments] = useState<TransparencyDocument[]>([]);
   const [isUploadingDocs, setIsUploadingDocs] = useState(false);
   const [uploadCategory, setUploadCategory] = useState('BALANÇO FINANCEIRO');
+
+  React.useEffect(() => {
+    if (!activeTransparencyCategories.includes(uploadCategory) && activeTransparencyCategories.length > 0) {
+      setUploadCategory(activeTransparencyCategories[0]);
+    }
+  }, [transparenciaNodes, legislacaoNodes, uploadCategory]);
   const [availableYears, setAvailableYears] = useState<string[]>(() => {
     const saved = localStorage.getItem('iteraima_years');
     return saved ? JSON.parse(saved) : ['2022', '2023', '2024', '2025', '2026'];
@@ -603,6 +731,150 @@ export default function App() {
     toast.success(`Pasta do ano ${yr} removida.`);
   };
 
+  const addNodeToTree = (nodes: MenuNode[], parentId: string | null, newNode: MenuNode): MenuNode[] => {
+    if (!parentId) {
+      return [...nodes, newNode];
+    }
+    return nodes.map(node => {
+      if (node.id === parentId) {
+        return {
+          ...node,
+          subItems: [...(node.subItems || []), newNode]
+        };
+      }
+      if (node.subItems) {
+        return {
+          ...node,
+          subItems: addNodeToTree(node.subItems, parentId, newNode)
+        };
+      }
+      return node;
+    });
+  };
+
+  const removeNodeFromTree = (nodes: MenuNode[], targetId: string): MenuNode[] => {
+    return nodes
+      .filter(node => node.id !== targetId)
+      .map(node => {
+        if (node.subItems) {
+          return {
+            ...node,
+            subItems: removeNodeFromTree(node.subItems, targetId)
+          };
+        }
+        return node;
+      });
+  };
+
+  const handleCreateNode = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newNodeLabel.trim()) {
+      toast.error('O nome do item é obrigatório.');
+      return;
+    }
+
+    const uppercaseLabel = newNodeLabel.trim().toUpperCase();
+    const nodeId = 'node_' + Date.now();
+
+    const newNode: MenuNode = {
+      id: nodeId,
+      label: uppercaseLabel,
+      iconName: newNodeIcon,
+      type: newNodeType,
+      subItems: newNodeType === 'parent' ? [] : undefined
+    };
+
+    if (showAddNodeForm?.treeType === 'transparencia') {
+      const updated = addNodeToTree(transparenciaNodes, showAddNodeForm.parentId, newNode);
+      setTransparenciaNodes(updated);
+      localStorage.setItem('iteraima_transparencia_nodes', JSON.stringify(updated));
+    } else {
+      const updated = addNodeToTree(legislacaoNodes, showAddNodeForm.parentId, newNode);
+      setLegislacaoNodes(updated);
+      localStorage.setItem('iteraima_legislacao_nodes', JSON.stringify(updated));
+    }
+
+    toast.success(`"${uppercaseLabel}" adicionado com sucesso!`);
+    setShowAddNodeForm(null);
+    setNewNodeLabel('');
+    setNewNodeIcon('FileText');
+    setNewNodeType('years');
+  };
+
+  const handleDeleteNode = (treeType: 'transparencia' | 'legislacao', id: string, label: string) => {
+    if (window.confirm(`Tem certeza que deseja excluir "${label}"? Isso também removerá todos os sub-menus e categorias associados.`)) {
+      if (treeType === 'transparencia') {
+        const updated = removeNodeFromTree(transparenciaNodes, id);
+        setTransparenciaNodes(updated);
+        localStorage.setItem('iteraima_transparencia_nodes', JSON.stringify(updated));
+      } else {
+        const updated = removeNodeFromTree(legislacaoNodes, id);
+        setLegislacaoNodes(updated);
+        localStorage.setItem('iteraima_legislacao_nodes', JSON.stringify(updated));
+      }
+      toast.success(`"${label}" removido com sucesso.`);
+    }
+  };
+
+  const renderMenuTreeNodes = (nodes: MenuNode[], treeType: 'transparencia' | 'legislacao', depth = 0) => {
+    return (
+      <div className={`space-y-2 ${depth > 0 ? 'pl-4 border-l-2 border-primary/10 ml-3.5 mt-2' : ''}`}>
+        {nodes.map(node => {
+          const NodeIcon = IconMap[node.iconName] || FileText;
+          return (
+            <div key={node.id} className="space-y-1">
+              <div className="flex items-center justify-between bg-surface-container-low border border-primary/5 p-2.5 rounded-xl hover:border-primary/15 transition-all">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-8 h-8 bg-primary/10 rounded-lg flex items-center justify-center text-primary shrink-0">
+                    <NodeIcon className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <span className="text-xs font-bold text-on-surface block leading-tight">{node.label}</span>
+                    <span className="text-[9px] text-secondary font-medium uppercase tracking-wider block mt-0.5">
+                      {node.type === 'parent' ? '📂 Sub-menu' : node.type === 'months' ? '📅 Ano + Mês' : '📁 Pastas de Ano'}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-1.5">
+                  {node.type === 'parent' && (
+                    <button 
+                      onClick={() => {
+                        setShowAddNodeForm({
+                          treeType,
+                          parentId: node.id,
+                          parentLabel: node.label
+                        });
+                        setNewNodeLabel('');
+                        setNewNodeIcon('FileText');
+                        setNewNodeType('years');
+                      }}
+                      className="p-1 hover:bg-primary/10 text-primary rounded-md transition-colors"
+                      title="Adicionar sub-menu ou categoria aqui"
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+                  <button 
+                    onClick={() => handleDeleteNode(treeType, node.id, node.label)}
+                    className="p-1 hover:bg-red-50 text-red-500 rounded-md transition-colors"
+                    title="Excluir este item"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              </div>
+
+              {node.subItems && node.subItems.length > 0 && (
+                renderMenuTreeNodes(node.subItems, treeType, depth + 1)
+              )}
+            </div>
+          );
+        })}
+      </div>
+    );
+  };
+
   const handleDeleteNews = async (id: any) => {
     try {
       await api.deleteNews(id);
@@ -626,7 +898,22 @@ export default function App() {
           name: file.name,
           category: uploadCategory,
           year: uploadYear,
-          month: ['ESTAGIÁRIOS', 'FOLHA DE PAGAMENTO', 'TERCEIRIZADOS'].includes(uploadCategory) ? uploadMonth : undefined,
+          month: (() => {
+            const isMonthlyCategory = (category: string): boolean => {
+              let result = false;
+              const traverse = (node: MenuNode) => {
+                if (node.label === category && node.type === 'months') {
+                  result = true;
+                } else if (node.subItems) {
+                  node.subItems.forEach(traverse);
+                }
+              };
+              transparenciaNodes.forEach(traverse);
+              legislacaoNodes.forEach(traverse);
+              return result;
+            };
+            return isMonthlyCategory(uploadCategory);
+          })() ? uploadMonth : undefined,
           url: uploadRes.url
         });
       }
@@ -737,142 +1024,62 @@ export default function App() {
     }));
   };
 
-  const transparenciaItems = [
-    { 
-      label: 'ACORDO DE COOPERAÇÃO TÉCNICA', 
-      icon: Handshake,
-      subItems: getBasicYears()
-    },
-    { 
-      label: 'FINANCEIRA', 
-      icon: CircleDollarSign,
-      subItems: [
-        { 
-          label: 'BALANÇO FINANCEIRO', 
-          icon: FileText,
+  const IconMap: { [key: string]: any } = {
+    Handshake,
+    CircleDollarSign,
+    FileText,
+    ClipboardList,
+    Calendar,
+    Clock,
+    Map,
+    Home,
+    FileSignature,
+    Rss,
+    Users,
+    UsersRound,
+    UserRound,
+    Scale,
+    ShieldCheck,
+    ShieldAlert,
+    Folder,
+    Plus,
+    X,
+    File,
+    Menu,
+    Search,
+    Eye,
+    Wallet
+  };
+
+  const mapMenuNodesToAppItems = (nodes: MenuNode[]): any[] => {
+    return nodes.map(node => {
+      const IconComponent = IconMap[node.iconName] || FileText;
+      if (node.type === 'years') {
+        return {
+          label: node.label,
+          icon: IconComponent,
+          isCategory: true,
           subItems: getBasicYears()
-        },
-        { 
-          label: 'CONTRATAÇÃO DIRETA', 
-          icon: Handshake,
-          subItems: getBasicYears()
-        },
-        { 
-          label: 'CONTRATOS E ADITIVOS', 
-          icon: FileSignature,
-          subItems: getBasicYears()
-        },
-        { 
-          label: 'COSLIC', 
-          icon: ClipboardList,
-          subItems: [
-            { 
-              label: 'AVISO', 
-              icon: FileText,
-              subItems: getBasicYears()
-            },
-            { 
-              label: 'COMUNICADO', 
-              icon: FileText,
-              subItems: getBasicYears()
-            },
-            { 
-              label: 'DISPENSA', 
-              icon: FileText,
-              subItems: getBasicYears()
-            },
-            { 
-              label: 'EDITAIS', 
-              icon: FileText,
-              subItems: getBasicYears()
-            },
-            { 
-              label: 'INEXIGIBILIDADE', 
-              icon: FileText,
-              subItems: getBasicYears()
-            },
-            { 
-              label: 'RESULTADO', 
-              icon: FileText,
-              subItems: getBasicYears()
-            },
-            { 
-              label: 'SÍNTESE', 
-              icon: FileText,
-              subItems: getBasicYears()
-            },
-            { 
-              label: 'ATA DE REGISTRO DE PREÇOS', 
-              icon: FileText,
-              subItems: getBasicYears()
-            }
-          ]
-        },
-        { 
-          label: 'PLANO DE CONTRATAÇÃO ANUAL – PCA', 
-          icon: Calendar,
-          subItems: getBasicYears()
-        }
-      ]
-    },
-    { 
-      label: 'FUNDIÁRIA', 
-      icon: Map,
-      subItems: [
-        { 
-          label: 'IMÓVEIS', 
-          icon: Home,
-          subItems: getBasicYears()
-        },
-        { 
-          label: 'REGULARIZADOS', 
-          icon: FileSignature,
-          subItems: getBasicYears()
-        },
-        { 
-          label: 'NOTIFICAÇÕES', 
-          icon: Rss,
-          subItems: getBasicYears()
-        },
-        { 
-          label: 'REQUERIMENTO DE REGULARIZAÇÃO', 
-          icon: ClipboardList,
-          subItems: getBasicYears()
-        }
-      ]
-    },
-    { 
-      label: 'DE PESSOAS', 
-      icon: Users,
-      subItems: [
-        { 
-          label: 'CONCURSOS E SELEÇÕES', 
-          icon: UsersRound,
-          subItems: getBasicYears()
-        },
-        { 
-          label: 'DIÁRIAS', 
-          icon: CircleDollarSign,
-          subItems: getBasicYears()
-        },
-        { 
-          label: 'ESTAGIÁRIOS', 
-          icon: UserRound,
+        };
+      } else if (node.type === 'months') {
+        return {
+          label: node.label,
+          icon: IconComponent,
+          isCategory: true,
           subItems: getMonthlyYears()
-        },
-        { 
-          label: 'FOLHA DE PAGAMENTO', 
-          icon: FileText,
-          subItems: getMonthlyYears()
-        },
-        { 
-          label: 'TERCEIRIZADOS', 
-          icon: Handshake,
-          subItems: getMonthlyYears()
-        }
-      ]
-    }
-  ];
+        };
+      } else {
+        return {
+          label: node.label,
+          icon: IconComponent,
+          isCategory: false,
+          subItems: node.subItems ? mapMenuNodesToAppItems(node.subItems) : []
+        };
+      }
+    });
+  };
+
+  const transparenciaItems = mapMenuNodesToAppItems(transparenciaNodes);
 
   const governoLinks = [
     { label: 'PORTAL DA TRANSPARÊNCIA', icon: Eye, url: 'https://www.transparencia.rr.gov.br/' },
@@ -887,34 +1094,7 @@ export default function App() {
     { label: 'GALERIA DE PRESIDENTES', icon: Image }
   ];
 
-  const legislacaoItems = [
-    { 
-      label: 'ADMINISTRATIVA', 
-      icon: Scale,
-      subItems: getBasicYears()
-    },
-    { 
-      label: 'FUNDIÁRIA', 
-      icon: FileText,
-      subItems: [
-        { 
-          label: 'RURAL', 
-          icon: ShieldCheck,
-          subItems: getBasicYears()
-        },
-        { 
-          label: 'URBANA', 
-          icon: ShieldAlert,
-          subItems: getBasicYears()
-        }
-      ]
-    },
-    { 
-      label: 'MODELOS DE REQUERIMENTOS', 
-      icon: FileSignature,
-      subItems: getBasicYears()
-    }
-  ];
+  const legislacaoItems = mapMenuNodesToAppItems(legislacaoNodes);
 
   return (
     <div className="min-h-screen bg-background text-on-surface font-body pb-24">
@@ -963,7 +1143,7 @@ export default function App() {
                         <button 
                           onClick={() => {
                             if (item.subItems) {
-                              if (item.subItems.some(i => i.label === '2022')) {
+                              if (item.isCategory) {
                                 setSelectedFolder({ label: item.label, items: item.subItems });
                                 setCurrentPage('folder');
                                 setIsSidebarOpen(false);
@@ -983,7 +1163,7 @@ export default function App() {
                             <item.icon className="w-4 h-4 opacity-60" />
                             {item.label}
                           </div>
-                          {item.subItems && !item.subItems.some(i => i.label === '2022') && (
+                          {item.subItems && !item.isCategory && (
                             <ChevronRight className={`w-4 h-4 transition-transform ${openLevel2Menu === item.label ? 'rotate-90' : ''}`} />
                           )}
                         </button>
@@ -1002,7 +1182,7 @@ export default function App() {
                                     <button 
                                       onClick={() => {
                                         if (sub.subItems) {
-                                          if (sub.subItems.some(i => i.label === '2022')) {
+                                          if (sub.isCategory) {
                                             setSelectedFolder({ label: sub.label, items: sub.subItems });
                                             setCurrentPage('folder');
                                             setIsSidebarOpen(false);
@@ -1040,7 +1220,7 @@ export default function App() {
                                                 <button 
                                                   onClick={() => {
                                                     if (subItem.subItems) {
-                                                      if (subItem.subItems.some(i => i.label === '2022')) {
+                                                      if (subItem.isCategory) {
                                                         setSelectedFolder({ label: subItem.label, items: subItem.subItems });
                                                         setCurrentPage('folder');
                                                         setIsSidebarOpen(false);
@@ -1170,7 +1350,7 @@ export default function App() {
                             <button 
                               onClick={() => {
                                 if (item.subItems) {
-                                  if (item.subItems.some(i => i.label === '2022')) {
+                                  if (item.isCategory) {
                                     setSelectedFolder({ label: item.label, items: item.subItems });
                                     setCurrentPage('folder');
                                     setIsSidebarOpen(false);
@@ -1190,12 +1370,12 @@ export default function App() {
                                 <item.icon className="w-4 h-4 opacity-60" />
                                 {item.label}
                               </div>
-                              {item.subItems && !item.subItems.some(i => i.label === '2022') && (
+                              {item.subItems && !item.isCategory && (
                                 <ChevronRight className={`w-4 h-4 transition-transform ${openLevel2Menu === item.label ? 'rotate-90' : ''}`} />
                               )}
                             </button>
 
-                            {item.subItems && !item.subItems.some(i => i.label === '2022') && (
+                            {item.subItems && !item.isCategory && (
                               <AnimatePresence>
                                 {openLevel2Menu === item.label && (
                                   <motion.div 
@@ -1374,7 +1554,7 @@ export default function App() {
                             <button 
                               onClick={() => {
                                 if (sub.subItems) {
-                                  if (sub.subItems.some(i => i.label === '2022')) {
+                                  if (sub.isCategory) {
                                     setSelectedFolder({ label: sub.label, items: sub.subItems });
                                     setCurrentPage('folder');
                                     setShowTransparenciaSub(false);
@@ -1397,7 +1577,7 @@ export default function App() {
                                 </div>
                                 {sub.label}
                               </div>
-                              {sub.subItems && !sub.subItems.some(i => i.label === '2022') && (
+                              {sub.subItems && !sub.isCategory && (
                                 <ChevronRight className={`w-4 h-4 transition-transform ${openLevel2Menu === sub.label ? 'rotate-90' : ''}`} />
                               )}
                             </button>
@@ -1416,7 +1596,7 @@ export default function App() {
                                         <button 
                                           onClick={() => {
                                             if (item.subItems) {
-                                              if (item.subItems.some(i => i.label === '2022')) {
+                                              if (item.isCategory) {
                                                 setSelectedFolder({ label: item.label, items: item.subItems });
                                                 setCurrentPage('folder');
                                                 setShowTransparenciaSub(false);
@@ -1454,7 +1634,7 @@ export default function App() {
                                                     <button 
                                                       onClick={() => {
                                                         if (subItem.subItems) {
-                                                          if (subItem.subItems.some(i => i.label === '2022')) {
+                                                          if (subItem.isCategory) {
                                                             setSelectedFolder({ label: subItem.label, items: subItem.subItems });
                                                             setCurrentPage('folder');
                                                             setShowTransparenciaSub(false);
@@ -1604,7 +1784,7 @@ export default function App() {
                             <button 
                               onClick={() => {
                                 if (sub.subItems) {
-                                  if (sub.subItems.some(i => i.label === '2022')) {
+                                  if (sub.isCategory) {
                                     setSelectedFolder({ label: sub.label, items: sub.subItems });
                                     setCurrentPage('folder');
                                     setShowLegislacaoSub(false);
@@ -1627,12 +1807,12 @@ export default function App() {
                                 </div>
                                 {sub.label}
                               </div>
-                              {sub.subItems && !sub.subItems.some(i => i.label === '2022') && (
+                              {sub.subItems && !sub.isCategory && (
                                 <ChevronRight className={`w-4 h-4 transition-transform ${openLevel2Menu === sub.label ? 'rotate-90' : ''}`} />
                               )}
                             </button>
 
-                            {sub.subItems && !sub.subItems.some(i => i.label === '2022') && (
+                            {sub.subItems && !sub.isCategory && (
                               <AnimatePresence>
                                 {openLevel2Menu === sub.label && (
                                   <motion.div 
@@ -2529,7 +2709,7 @@ export default function App() {
                             onChange={(e) => setUploadCategory(e.target.value)}
                             className="w-full bg-surface-container-low border-none rounded-2xl px-4 py-3 text-sm focus:ring-2 focus:ring-primary transition-all"
                           >
-                            {transparencyCategories.map(cat => (
+                            {activeTransparencyCategories.map(cat => (
                               <option key={cat} value={cat}>{cat}</option>
                             ))}
                           </select>
@@ -2547,7 +2727,22 @@ export default function App() {
                               ))}
                             </select>
                           </div>
-                          {['ESTAGIÁRIOS', 'FOLHA DE PAGAMENTO', 'TERCEIRIZADOS'].includes(uploadCategory) && (
+                          {(() => {
+                            const isMonthlyCategory = (category: string): boolean => {
+                              let result = false;
+                              const traverse = (node: MenuNode) => {
+                                if (node.label === category && node.type === 'months') {
+                                  result = true;
+                                } else if (node.subItems) {
+                                  node.subItems.forEach(traverse);
+                                }
+                              };
+                              transparenciaNodes.forEach(traverse);
+                              legislacaoNodes.forEach(traverse);
+                              return result;
+                            };
+                            return isMonthlyCategory(uploadCategory);
+                          })() && (
                             <div>
                               <label className="block text-[10px] font-bold text-secondary uppercase tracking-widest mb-1.5 ml-1">Mês</label>
                               <select 
@@ -2693,6 +2888,154 @@ export default function App() {
                       </div>
                     </div>
                   </div>
+
+                  {/* Gerenciamento de Categorias e Sub-menus */}
+                  <div className="bg-white p-8 rounded-3xl shadow-xl border border-primary/5 space-y-6 mt-8">
+                    <div className="flex items-center gap-4">
+                      <div className="w-12 h-12 bg-primary/10 rounded-2xl flex items-center justify-center text-primary">
+                        <Plus className="w-6 h-6" />
+                      </div>
+                      <div>
+                        <h3 className="text-2xl font-black text-on-surface font-headline leading-none">Gerenciar Categorias e Sub-menus</h3>
+                        <p className="text-xs text-secondary mt-1">Crie, altere ou exclua categorias e sub-menus de navegação no Portal</p>
+                      </div>
+                    </div>
+
+                    <div className="p-4 bg-primary/5 rounded-2xl flex items-start gap-4 border border-primary/10">
+                      <span className="w-2 h-2 rounded-full bg-primary mt-1.5 shrink-0 animate-pulse" />
+                      <p className="text-xs text-secondary leading-relaxed">
+                        Gerencie a estrutura em árvore das seções do portal. Categorias criadas com o tipo <strong>"Pastas de Ano"</strong> ou <strong>"Ano + Mês"</strong> aceitam o envio de arquivos e listam automaticamente as pastas correspondentes. Sub-menus servem para agrupar e organizar outras categorias dentro deles.
+                      </p>
+                    </div>
+
+                    <div className="grid md:grid-cols-2 gap-8 items-start">
+                      {/* Coluna Portal da Transparência */}
+                      <div className="space-y-4">
+                        <div className="flex items-center justify-between border-b border-primary/5 pb-2">
+                          <span className="text-[11px] font-bold text-primary uppercase tracking-wider">Portal da Transparência</span>
+                          <button 
+                            onClick={() => {
+                              setShowAddNodeForm({
+                                treeType: 'transparencia',
+                                parentId: null,
+                                parentLabel: 'Raiz da Transparência'
+                              });
+                              setNewNodeLabel('');
+                              setNewNodeIcon('FileText');
+                              setNewNodeType('years');
+                            }}
+                            className="text-[10px] font-bold text-primary hover:bg-primary/5 px-2.5 py-1.5 rounded-lg flex items-center gap-1 transition-all uppercase"
+                          >
+                            <Plus className="w-3.5 h-3.5" /> Adicionar Principal
+                          </button>
+                        </div>
+                        <div className="max-h-[500px] overflow-y-auto pr-1">
+                          {renderMenuTreeNodes(transparenciaNodes, 'transparencia')}
+                        </div>
+                      </div>
+
+                      {/* Coluna Legislação */}
+                      <div className="space-y-4">
+                        <div className="flex items-center justify-between border-b border-primary/5 pb-2">
+                          <span className="text-[11px] font-bold text-primary uppercase tracking-wider">Legislação</span>
+                          <button 
+                            onClick={() => {
+                              setShowAddNodeForm({
+                                treeType: 'legislacao',
+                                parentId: null,
+                                parentLabel: 'Raiz de Legislação'
+                              });
+                              setNewNodeLabel('');
+                              setNewNodeIcon('FileText');
+                              setNewNodeType('years');
+                            }}
+                            className="text-[10px] font-bold text-primary hover:bg-primary/5 px-2.5 py-1.5 rounded-lg flex items-center gap-1 transition-all uppercase"
+                          >
+                            <Plus className="w-3.5 h-3.5" /> Adicionar Principal
+                          </button>
+                        </div>
+                        <div className="max-h-[500px] overflow-y-auto pr-1">
+                          {renderMenuTreeNodes(legislacaoNodes, 'legislacao')}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Modal Overlay para Adicionar Categoria/Sub-menu */}
+                  {showAddNodeForm && (
+                    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[80] flex items-center justify-center p-4">
+                      <div className="bg-white rounded-3xl p-6 shadow-2xl max-w-md w-full border border-primary/10 space-y-6">
+                        <div>
+                          <span className="text-[9px] font-bold text-primary uppercase tracking-widest block mb-1">Adicionando em: {showAddNodeForm.parentLabel}</span>
+                          <h4 className="text-xl font-black text-on-surface font-headline leading-tight">Novo Item de Menu</h4>
+                        </div>
+
+                        <form onSubmit={handleCreateNode} className="space-y-4">
+                          <div>
+                            <label className="block text-[10px] font-bold text-secondary uppercase tracking-widest mb-1.5 ml-1">Nome do Item / Categoria</label>
+                            <input 
+                              type="text"
+                              required
+                              placeholder="EX: BALANÇO FINANCEIRO, RURAL, ETC."
+                              value={newNodeLabel}
+                              onChange={(e) => setNewNodeLabel(e.target.value)}
+                              className="w-full bg-surface-container-low border-none rounded-2xl px-4 py-3 text-sm font-bold focus:ring-2 focus:ring-primary transition-all text-on-surface"
+                            />
+                          </div>
+
+                          <div>
+                            <label className="block text-[10px] font-bold text-secondary uppercase tracking-widest mb-1.5 ml-1">Tipo do Item</label>
+                            <select 
+                              value={newNodeType}
+                              onChange={(e) => setNewNodeType(e.target.value as any)}
+                              className="w-full bg-surface-container-low border-none rounded-2xl px-4 py-3 text-sm font-bold focus:ring-2 focus:ring-primary transition-all text-on-surface"
+                            >
+                              <option value="years">📁 Categoria com Pastas de Ano (Básico)</option>
+                              <option value="months">📅 Categoria com Pastas de Ano + Mês (Estagiários, Folha, etc.)</option>
+                              <option value="parent">📂 Sub-menu (Agrupador/Pai de outras categorias)</option>
+                            </select>
+                          </div>
+
+                          <div>
+                            <label className="block text-[10px] font-bold text-secondary uppercase tracking-widest mb-1.5 ml-1">Selecione um Ícone</label>
+                            <div className="grid grid-cols-4 gap-2 max-h-36 overflow-y-auto p-1 bg-surface-container-low rounded-2xl border border-primary/5">
+                              {availableIconsForSelection.map(item => {
+                                const IconComponent = item.icon;
+                                return (
+                                  <button
+                                    key={item.name}
+                                    type="button"
+                                    onClick={() => setNewNodeIcon(item.name)}
+                                    className={`p-2.5 rounded-xl flex flex-col items-center justify-center gap-1 transition-all ${newNodeIcon === item.name ? 'bg-primary text-white shadow-md' : 'hover:bg-primary/10 text-secondary'}`}
+                                    title={item.label}
+                                  >
+                                    <IconComponent className="w-5 h-5 shrink-0" />
+                                    <span className="text-[7px] truncate max-w-full font-bold">{item.name}</span>
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          </div>
+
+                          <div className="flex gap-3 pt-2">
+                            <button
+                              type="button"
+                              onClick={() => setShowAddNodeForm(null)}
+                              className="flex-1 bg-surface-container-low hover:bg-surface-container-high text-secondary font-bold py-3 px-4 rounded-xl text-xs uppercase tracking-wider transition-all"
+                            >
+                              Cancelar
+                            </button>
+                            <button
+                              type="submit"
+                              className="flex-1 bg-primary hover:bg-primary/90 text-white font-bold py-3 px-4 rounded-xl text-xs uppercase tracking-wider shadow-lg shadow-primary/20 transition-all"
+                            >
+                              Criar Item
+                            </button>
+                          </div>
+                        </form>
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
 
