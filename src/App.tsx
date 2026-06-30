@@ -359,35 +359,41 @@ export default function App() {
     const fetchData = async () => {
       try {
         const [news, docs, cover, logo, favicon, pres, dir, gal, menuNodes] = await Promise.all([
-          api.getNews(),
-          api.getDocuments(),
-          api.getCoverPhoto(),
-          api.getLogo(),
-          api.getFavicon(),
-          api.getPresidencia(),
-          api.getDiretorias(),
-          api.getGaleria(),
+          api.getNews().catch(err => { console.error("Error fetching news:", err); return []; }),
+          api.getDocuments().catch(err => { console.error("Error fetching documents:", err); return []; }),
+          api.getCoverPhoto().catch(err => { console.error("Error fetching cover:", err); return { url: '' }; }),
+          api.getLogo().catch(err => { console.error("Error fetching logo:", err); return { url: '' }; }),
+          api.getFavicon().catch(err => { console.error("Error fetching favicon:", err); return { url: '' }; }),
+          api.getPresidencia().catch(err => { console.error("Error fetching presidencia:", err); return null; }),
+          api.getDiretorias().catch(err => { console.error("Error fetching diretorias:", err); return []; }),
+          api.getGaleria().catch(err => { console.error("Error fetching galeria:", err); return []; }),
           api.getMenuNodes().catch(err => {
             console.warn("Failed to load database menu nodes, falling back:", err);
-            return { transparencia: [], legislacao: [] };
+            return { transparencia: [], legislacao: [], years: [] };
           })
         ]);
         setNewsList(news);
         setDocuments(docs);
-        if (cover.url) setCoverPhotoUrl(cover.url);
-        if (logo.url) setLogoUrl(logo.url);
-        if (favicon.url) setFaviconUrl(favicon.url);
-        setPresidencia(pres);
+        if (cover && cover.url) setCoverPhotoUrl(cover.url);
+        if (logo && logo.url) setLogoUrl(logo.url);
+        if (favicon && favicon.url) setFaviconUrl(favicon.url);
+        if (pres) setPresidencia(pres);
         setDiretorias(dir);
         setGaleria(gal);
         
-        if (menuNodes && menuNodes.transparencia && menuNodes.transparencia.length > 0) {
-          setTransparenciaNodes(menuNodes.transparencia);
-          localStorage.setItem('iteraima_transparencia_nodes', JSON.stringify(menuNodes.transparencia));
-        }
-        if (menuNodes && menuNodes.legislacao && menuNodes.legislacao.length > 0) {
-          setLegislacaoNodes(menuNodes.legislacao);
-          localStorage.setItem('iteraima_legislacao_nodes', JSON.stringify(menuNodes.legislacao));
+        if (menuNodes) {
+          if (menuNodes.transparencia && menuNodes.transparencia.length > 0) {
+            setTransparenciaNodes(menuNodes.transparencia);
+            localStorage.setItem('iteraima_transparencia_nodes', JSON.stringify(menuNodes.transparencia));
+          }
+          if (menuNodes.legislacao && menuNodes.legislacao.length > 0) {
+            setLegislacaoNodes(menuNodes.legislacao);
+            localStorage.setItem('iteraima_legislacao_nodes', JSON.stringify(menuNodes.legislacao));
+          }
+          if (menuNodes.years && menuNodes.years.length > 0) {
+            setAvailableYears(menuNodes.years);
+            localStorage.setItem('iteraima_years', JSON.stringify(menuNodes.years));
+          }
         }
       } catch (error) {
         console.error("Error fetching initial data:", error);
@@ -704,7 +710,7 @@ export default function App() {
   const handleAddYearFolder = () => {
     const trimmed = newYearInput.trim();
     if (!trimmed) {
-      toast.error('Por favor, informe o ano.');
+      toast.error('Por favor, info o ano.');
       return;
     }
     if (!/^\d{4}$/.test(trimmed)) {
@@ -718,6 +724,9 @@ export default function App() {
     const nextYears = [...availableYears, trimmed].sort((a, b) => b.localeCompare(a));
     setAvailableYears(nextYears);
     localStorage.setItem('iteraima_years', JSON.stringify(nextYears));
+    api.updateMenuNodes(transparenciaNodes, legislacaoNodes, nextYears).catch(err => {
+      console.error("Erro ao salvar anos no banco:", err);
+    });
     setNewYearInput('');
     toast.success(`Pasta do ano ${trimmed} criada com sucesso em todas as seções do Portal!`);
   };
@@ -733,6 +742,9 @@ export default function App() {
     const nextYears = availableYears.filter(y => y !== yr);
     setAvailableYears(nextYears);
     localStorage.setItem('iteraima_years', JSON.stringify(nextYears));
+    api.updateMenuNodes(transparenciaNodes, legislacaoNodes, nextYears).catch(err => {
+      console.error("Erro ao salvar anos no banco:", err);
+    });
     toast.success(`Pasta do ano ${yr} removida.`);
   };
 
@@ -793,7 +805,7 @@ export default function App() {
       const updated = addNodeToTree(transparenciaNodes, showAddNodeForm.parentId, newNode);
       setTransparenciaNodes(updated);
       localStorage.setItem('iteraima_transparencia_nodes', JSON.stringify(updated));
-      api.updateMenuNodes(updated, legislacaoNodes).catch(err => {
+      api.updateMenuNodes(updated, legislacaoNodes, availableYears).catch(err => {
         console.error("Erro ao salvar no banco:", err);
         toast.error("Erro ao salvar as alterações no servidor.");
       });
@@ -801,7 +813,7 @@ export default function App() {
       const updated = addNodeToTree(legislacaoNodes, showAddNodeForm.parentId, newNode);
       setLegislacaoNodes(updated);
       localStorage.setItem('iteraima_legislacao_nodes', JSON.stringify(updated));
-      api.updateMenuNodes(transparenciaNodes, updated).catch(err => {
+      api.updateMenuNodes(transparenciaNodes, updated, availableYears).catch(err => {
         console.error("Erro ao salvar no banco:", err);
         toast.error("Erro ao salvar as alterações no servidor.");
       });
@@ -820,7 +832,7 @@ export default function App() {
         const updated = removeNodeFromTree(transparenciaNodes, id);
         setTransparenciaNodes(updated);
         localStorage.setItem('iteraima_transparencia_nodes', JSON.stringify(updated));
-        api.updateMenuNodes(updated, legislacaoNodes).catch(err => {
+        api.updateMenuNodes(updated, legislacaoNodes, availableYears).catch(err => {
           console.error("Erro ao salvar no banco:", err);
           toast.error("Erro ao salvar as alterações no servidor.");
         });
@@ -828,7 +840,7 @@ export default function App() {
         const updated = removeNodeFromTree(legislacaoNodes, id);
         setLegislacaoNodes(updated);
         localStorage.setItem('iteraima_legislacao_nodes', JSON.stringify(updated));
-        api.updateMenuNodes(transparenciaNodes, updated).catch(err => {
+        api.updateMenuNodes(transparenciaNodes, updated, availableYears).catch(err => {
           console.error("Erro ao salvar no banco:", err);
           toast.error("Erro ao salvar as alterações no servidor.");
         });

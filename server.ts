@@ -318,42 +318,161 @@ async function startServer() {
 
   // Menu Nodes (Transparency & Legislation Categories)
   app.get("/api/settings/menu_nodes", async (req, res) => {
+    const DEFAULT_TRANSPARENCIA = [
+      {
+        "id": "act",
+        "label": "ACORDO DE COOPERAÇÃO TÉCNICA",
+        "iconName": "Handshake",
+        "type": "years"
+      },
+      {
+        "id": "fin",
+        "label": "FINANCEIRA",
+        "iconName": "CircleDollarSign",
+        "type": "parent",
+        "subItems": [
+          { "id": "fin_bal", "label": "BALANÇO FINANCEIRO", "iconName": "FileText", "type": "years" },
+          { "id": "fin_con", "label": "CONTRATAÇÃO DIRETA", "iconName": "Handshake", "type": "years" },
+          { "id": "fin_cta", "label": "CONTRATOS E ADITIVOS", "iconName": "FileSignature", "type": "years" },
+          {
+            "id": "fin_cos",
+            "label": "COSLIC",
+            "iconName": "ClipboardList",
+            "type": "parent",
+            "subItems": [
+              { "id": "cos_avi", "label": "AVISO", "iconName": "FileText", "type": "years" },
+              { "id": "cos_com", "label": "COMUNICADO", "iconName": "FileText", "type": "years" },
+              { "id": "cos_dis", "label": "DISPENSA", "iconName": "FileText", "type": "years" },
+              { "id": "cos_edi", "label": "EDITAIS", "iconName": "FileText", "type": "years" },
+              { "id": "cos_ine", "label": "INEXIGIBILIDADE", "iconName": "FileText", "type": "years" },
+              { "id": "cos_res", "label": "RESULTADO", "iconName": "FileText", "type": "years" },
+              { "id": "cos_sin", "label": "SÍNTESE", "iconName": "FileText", "type": "years" },
+              { "id": "cos_ata", "label": "ATA DE REGISTRO DE PREÇOS", "iconName": "FileText", "type": "years" }
+            ]
+          },
+          { "id": "fin_pca", "label": "PLANO DE CONTRATAÇÃO ANUAL – PCA", "iconName": "Calendar", "type": "years" }
+        ]
+      },
+      {
+        "id": "fun",
+        "label": "FUNDIÁRIA",
+        "iconName": "Map",
+        "type": "parent",
+        "subItems": [
+          { "id": "fun_imo", "label": "IMÓVEIS", "iconName": "Home", "type": "years" },
+          { "id": "fun_reg", "label": "REGULARIZADOS", "iconName": "FileSignature", "type": "years" },
+          { "id": "fun_not", "label": "NOTIFICAÇÕES", "iconName": "Rss", "type": "years" },
+          { "id": "fun_req", "label": "REQUERIMENTO DE REGULARIZAÇÃO", "iconName": "ClipboardList", "type": "years" }
+        ]
+      },
+      {
+        "id": "pes",
+        "label": "DE PESSOAS",
+        "iconName": "Users",
+        "type": "parent",
+        "subItems": [
+          { "id": "pes_con", "label": "CONCURSOS E SELEÇÕES", "iconName": "UsersRound", "type": "years" },
+          { "id": "pes_dia", "label": "DIÁRIAS", "iconName": "CircleDollarSign", "type": "years" },
+          { "id": "pes_est", "label": "ESTAGIÁRIOS", "iconName": "UserRound", "type": "months" },
+          { "id": "pes_fol", "label": "FOLHA DE PAGAMENTO", "iconName": "FileText", "type": "months" },
+          { "id": "pes_ter", "label": "TERCEIRIZADOS", "iconName": "Handshake", "type": "months" }
+        ]
+      }
+    ];
+
+    const DEFAULT_LEGISLACAO = [
+      {
+        "id": "leg_adm",
+        "label": "ADMINISTRATIVA",
+        "iconName": "Scale",
+        "type": "years"
+      },
+      {
+        "id": "leg_fun",
+        "label": "FUNDIÁRIA",
+        "iconName": "FileText",
+        "type": "parent",
+        "subItems": [
+          { "id": "leg_fun_rur", "label": "RURAL", "iconName": "ShieldCheck", "type": "years" },
+          { "id": "leg_fun_urb", "label": "URBANA", "iconName": "ShieldAlert", "type": "years" }
+        ]
+      },
+      {
+        "id": "leg_mod",
+        "label": "MODELOS DE REQUERIMENTOS",
+        "iconName": "FileSignature",
+        "type": "years"
+      }
+    ];
+
+    const DEFAULT_YEARS = ["2022", "2023", "2024", "2025", "2026"];
+
     try {
-      const { rows } = await pool.query("SELECT key, value FROM settings WHERE key IN ('transparencia_nodes', 'legislacao_nodes')");
-      const result: { transparencia: any[], legislacao: any[] } = {
-        transparencia: [],
-        legislacao: []
-      };
+      const { rows } = await pool.query("SELECT key, value FROM settings WHERE key IN ('transparencia_nodes', 'legislacao_nodes', 'available_years')");
+      let dbTransparencia = null;
+      let dbLegislacao = null;
+      let dbYears = null;
+
       rows.forEach(row => {
         if (row.key === 'transparencia_nodes') {
           try {
-            result.transparencia = JSON.parse(row.value);
+            dbTransparencia = JSON.parse(row.value);
           } catch (e) {
-            result.transparencia = [];
+            dbTransparencia = null;
           }
         } else if (row.key === 'legislacao_nodes') {
           try {
-            result.legislacao = JSON.parse(row.value);
+            dbLegislacao = JSON.parse(row.value);
           } catch (e) {
-            result.legislacao = [];
+            dbLegislacao = null;
+          }
+        } else if (row.key === 'available_years') {
+          try {
+            dbYears = JSON.parse(row.value);
+          } catch (e) {
+            dbYears = null;
           }
         }
       });
-      res.json(result);
+
+      const finalTransparencia = dbTransparencia || DEFAULT_TRANSPARENCIA;
+      const finalLegislacao = dbLegislacao || DEFAULT_LEGISLACAO;
+      const finalYears = dbYears || DEFAULT_YEARS;
+
+      // Seed them in DB if not present so any client/incognito can read them
+      if (!dbTransparencia) {
+        await pool.query("INSERT INTO settings (key, value) VALUES ('transparencia_nodes', $1) ON CONFLICT (key) DO UPDATE SET value = $1", [JSON.stringify(DEFAULT_TRANSPARENCIA)]);
+      }
+      if (!dbLegislacao) {
+        await pool.query("INSERT INTO settings (key, value) VALUES ('legislacao_nodes', $1) ON CONFLICT (key) DO UPDATE SET value = $1", [JSON.stringify(DEFAULT_LEGISLACAO)]);
+      }
+      if (!dbYears) {
+        await pool.query("INSERT INTO settings (key, value) VALUES ('available_years', $1) ON CONFLICT (key) DO UPDATE SET value = $1", [JSON.stringify(DEFAULT_YEARS)]);
+      }
+
+      res.json({
+        transparencia: finalTransparencia,
+        legislacao: finalLegislacao,
+        years: finalYears
+      });
     } catch (err) {
+      console.error("Erro ao buscar categorias do menu:", err);
       res.status(500).json({ message: "Erro ao buscar categorias do menu" });
     }
   });
 
   app.post("/api/settings/menu_nodes", authenticateToken, async (req: any, res) => {
     if (req.user.role !== 'admin' && req.user.role !== 'editor') return res.sendStatus(403);
-    const { transparencia, legislacao } = req.body;
+    const { transparencia, legislacao, years } = req.body;
     try {
       if (transparencia) {
         await pool.query("INSERT INTO settings (key, value) VALUES ('transparencia_nodes', $1) ON CONFLICT (key) DO UPDATE SET value = $1", [JSON.stringify(transparencia)]);
       }
       if (legislacao) {
         await pool.query("INSERT INTO settings (key, value) VALUES ('legislacao_nodes', $1) ON CONFLICT (key) DO UPDATE SET value = $1", [JSON.stringify(legislacao)]);
+      }
+      if (years) {
+        await pool.query("INSERT INTO settings (key, value) VALUES ('available_years', $1) ON CONFLICT (key) DO UPDATE SET value = $1", [JSON.stringify(years)]);
       }
       res.json({ message: "Categorias do menu atualizadas com sucesso" });
     } catch (err) {
