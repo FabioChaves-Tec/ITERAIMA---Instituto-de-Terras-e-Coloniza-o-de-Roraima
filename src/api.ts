@@ -53,6 +53,14 @@ export interface GaleriaPresidente {
   created_at: string;
 }
 
+export interface MenuNode {
+  id: string;
+  label: string;
+  iconName: string;
+  type: 'years' | 'months' | 'parent';
+  subItems?: MenuNode[];
+}
+
 const getHeaders = () => {
   const token = localStorage.getItem('token');
   return {
@@ -324,6 +332,22 @@ export const api = {
       headers: getHeaders()
     });
     if (!res.ok) throw new Error('Erro ao remover da galeria');
+    return res.json();
+  },
+
+  async getMenuNodes(): Promise<{ transparencia: MenuNode[], legislacao: MenuNode[] }> {
+    const res = await fetch(`${API_URL}/api/settings/menu_nodes`);
+    if (!res.ok) throw new Error('Erro ao buscar categorias do menu');
+    return res.json();
+  },
+
+  async updateMenuNodes(transparencia: MenuNode[], legislacao: MenuNode[]) {
+    const res = await fetch(`${API_URL}/api/settings/menu_nodes`, {
+      method: 'POST',
+      headers: getHeaders(),
+      body: JSON.stringify({ transparencia, legislacao })
+    });
+    if (!res.ok) throw new Error('Erro ao salvar categorias do menu');
     return res.json();
   }
 };
