@@ -335,17 +335,17 @@ export const api = {
     return res.json();
   },
 
-  async getMenuNodes(): Promise<{ transparencia: MenuNode[], legislacao: MenuNode[] }> {
+  async getMenuNodes(): Promise<{ transparencia: MenuNode[], legislacao: MenuNode[], years: string[] }> {
     const res = await fetch(`${API_URL}/api/settings/menu_nodes`);
     if (!res.ok) throw new Error('Erro ao buscar categorias do menu');
     return res.json();
   },
 
-  async updateMenuNodes(transparencia: MenuNode[], legislacao: MenuNode[]) {
+  async updateMenuNodes(transparencia: MenuNode[], legislacao: MenuNode[], years?: string[]) {
     const res = await fetch(`${API_URL}/api/settings/menu_nodes`, {
       method: 'POST',
       headers: getHeaders(),
-      body: JSON.stringify({ transparencia, legislacao })
+      body: JSON.stringify({ transparencia, legislacao, years })
     });
     if (!res.ok) throw new Error('Erro ao salvar categorias do menu');
     return res.json();
