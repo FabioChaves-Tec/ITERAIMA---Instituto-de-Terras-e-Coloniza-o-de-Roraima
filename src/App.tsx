@@ -2192,7 +2192,7 @@ export default function App() {
                   </motion.div>
                 ))}
               </div>
-            ) : (selectedFolder.items.find(i => i.label === selectedYear)?.subItems && !selectedMonth) ? (
+            ) : (selectedFolder.items.find(i => i.label === selectedYear)?.subItems && selectedFolder.items.find(i => i.label === selectedYear)!.subItems!.length > 0 && !selectedMonth) ? (
               <div className="grid grid-cols-2 gap-4">
                 {selectedFolder.items.find(i => i.label === selectedYear)?.subItems?.map((month: any) => (
                   <motion.div
