@@ -61,6 +61,29 @@ export interface MenuNode {
   subItems?: MenuNode[];
 }
 
+export interface IndicadoresTitulacao {
+  id?: number | null;
+  versao: number;
+  fonte: string;
+  gerado_em: string | null;
+  recebido_em: string | null;
+  titulos_urbanos_entregues: number;
+  titulos_rurais_entregues: number;
+  autorizacoes_ocupacao_entregues: number;
+  termos_ocupacao_entregues: number;
+  total_entregues: number;
+  status?: string;
+}
+
+export interface RegularizaStatus {
+  configured: boolean;
+  webhookUrl: string;
+  secretConfigured: boolean;
+  maskedSecret: string;
+  fullSecret?: string;
+  history: IndicadoresTitulacao[];
+}
+
 const getHeaders = () => {
   const token = localStorage.getItem('token');
   return {
@@ -348,6 +371,30 @@ export const api = {
       body: JSON.stringify({ transparencia, legislacao, years })
     });
     if (!res.ok) throw new Error('Erro ao salvar categorias do menu');
+    return res.json();
+  },
+
+  async getIndicadoresTitulacao(): Promise<IndicadoresTitulacao> {
+    const res = await fetch(`${API_URL}/api/indicadores-titulacao`);
+    if (!res.ok) throw new Error('Erro ao buscar indicadores de titulação');
+    return res.json();
+  },
+
+  async getRegularizaStatus(): Promise<RegularizaStatus> {
+    const res = await fetch(`${API_URL}/api/admin/regulariza/status`, {
+      headers: getHeaders()
+    });
+    if (!res.ok) throw new Error('Erro ao obter status do REGULARIZA');
+    return res.json();
+  },
+
+  async simulateRegulariza(data?: Partial<IndicadoresTitulacao>) {
+    const res = await fetch(`${API_URL}/api/admin/regulariza/simulate`, {
+      method: 'POST',
+      headers: getHeaders(),
+      body: JSON.stringify(data || {})
+    });
+    if (!res.ok) throw new Error('Erro ao simular envio do REGULARIZA');
     return res.json();
   }
 };

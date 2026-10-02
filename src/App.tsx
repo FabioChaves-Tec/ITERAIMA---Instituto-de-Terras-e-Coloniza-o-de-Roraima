@@ -59,6 +59,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import React, { useState, useEffect, FormEvent } from 'react';
 import { api, User, News, TransparencyDocument, Presidencia, Diretoria, GaleriaPresidente, MenuNode } from './api';
 import { AccessibilityPanel } from './components/AccessibilityPanel';
+import { IndicadoresRegulariza } from './components/IndicadoresRegulariza';
 const AiAssistant = React.lazy(() => import('./components/AiAssistant').then(m => ({ default: m.AiAssistant })));
 
 const IMAGES = {
@@ -1905,6 +1906,9 @@ export default function App() {
                 </motion.div>
               </div>
             </section>
+
+            {/* Painel de Indicadores de Titulação - Sistema REGULARIZA */}
+            <IndicadoresRegulariza className="mt-12 px-6" />
 
             {/* News Section (Destaques) */}
             <section className="mt-12 px-6">
