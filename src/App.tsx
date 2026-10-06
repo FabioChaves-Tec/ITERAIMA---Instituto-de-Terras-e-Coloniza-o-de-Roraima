@@ -1324,7 +1324,7 @@ export default function App() {
                 </div>
 
                 <a 
-                  href="https://iteraimacidadao.rr.gov.br/"
+                  href="https://iteraimacidadao.rr.gov.br/cadastrousuarioexterno/"
                   target="_blank"
                   rel="noopener noreferrer"
                   className="flex items-center gap-3 text-secondary font-bold text-sm w-full p-2 rounded-xl hover:bg-primary/5 transition-colors"
@@ -1741,7 +1741,7 @@ export default function App() {
 
                 {/* Iteraima Cidadão */}
                 <a 
-                  href="https://iteraimacidadao.rr.gov.br/"
+                  href="https://iteraimacidadao.rr.gov.br/cadastrousuarioexterno/"
                   target="_blank"
                   rel="noopener noreferrer"
                   className="bg-primary p-6 rounded-3xl shadow-[0_8px_32px_rgba(0,34,2,0.06)] flex flex-col items-center justify-center text-center gap-3 cursor-pointer hover:bg-primary-container transition-all active:scale-95"
@@ -3740,7 +3740,7 @@ export default function App() {
           <span className="text-[11px] font-medium uppercase tracking-wider mt-1">Início</span>
         </button>
         <a 
-          href="https://iteraimacidadao.rr.gov.br/"
+          href="https://iteraimacidadao.rr.gov.br/cadastrousuarioexterno/"
           target="_blank"
           rel="noopener noreferrer"
           className="flex flex-col items-center justify-center text-secondary px-4 py-1.5 hover:text-primary transition-all active:scale-90 duration-150"
