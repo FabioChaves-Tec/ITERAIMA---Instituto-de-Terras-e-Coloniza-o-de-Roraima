@@ -53,11 +53,14 @@ import {
   Lock,
   Volume2,
   MessageCircle,
+  Database,
+  Copy,
+  Check,
 } from 'lucide-react';
 import { Toaster, toast } from 'sonner';
 import { motion, AnimatePresence } from 'motion/react';
 import React, { useState, useEffect, FormEvent } from 'react';
-import { api, User, News, TransparencyDocument, Presidencia, Diretoria, GaleriaPresidente, MenuNode } from './api';
+import { api, User, News, TransparencyDocument, Presidencia, Diretoria, GaleriaPresidente, MenuNode, RegularizaStatus } from './api';
 import { AccessibilityPanel } from './components/AccessibilityPanel';
 import { IndicadoresRegulariza } from './components/IndicadoresRegulariza';
 const AiAssistant = React.lazy(() => import('./components/AiAssistant').then(m => ({ default: m.AiAssistant })));
@@ -217,7 +220,16 @@ export default function App() {
   const [currentPage, setCurrentPage] = useState<'home' | 'news' | 'admin' | 'folder' | 'presidencia' | 'diretorias' | 'galeria' | 'news-detail'>('home');
   const [selectedNews, setSelectedNews] = useState<News | null>(null);
   const [editingNewsId, setEditingNewsId] = useState<number | null>(null);
-  const [adminTab, setAdminTab] = useState<'publish' | 'users' | 'documents' | 'settings'>('publish');
+  const [adminTab, setAdminTab] = useState<'publish' | 'users' | 'documents' | 'settings' | 'regulariza'>('publish');
+  const [regularizaStatus, setRegularizaStatus] = useState<RegularizaStatus | null>(null);
+  const [isLoadingRegularizaStatus, setIsLoadingRegularizaStatus] = useState(false);
+  const [simUrbanos, setSimUrbanos] = useState('2840');
+  const [simRurais, setSimRurais] = useState('6120');
+  const [simAutorizacoes, setSimAutorizacoes] = useState('1450');
+  const [simTermos, setSimTermos] = useState('930');
+  const [isSimulating, setIsSimulating] = useState(false);
+  const [copiedWebhookUrl, setCopiedWebhookUrl] = useState(false);
+  const [copiedSecret, setCopiedSecret] = useState(false);
   const [selectedFolder, setSelectedFolder] = useState<{ label: string, items: any[] } | null>(null);
   const [selectedYear, setSelectedYear] = useState<string | null>(null);
   const [selectedMonth, setSelectedMonth] = useState<string | null>(null);
@@ -1049,6 +1061,42 @@ export default function App() {
       toast.error('Erro ao atualizar favicon');
     } finally {
       setIsUpdatingFavicon(false);
+    }
+  };
+
+  const fetchRegularizaStatus = async () => {
+    setIsLoadingRegularizaStatus(true);
+    try {
+      const data = await api.getRegularizaStatus();
+      setRegularizaStatus(data);
+    } catch (error) {
+      console.error('Erro ao buscar status do REGULARIZA:', error);
+    } finally {
+      setIsLoadingRegularizaStatus(false);
+    }
+  };
+
+  const handleSimulateRegulariza = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsSimulating(true);
+    try {
+      const u = Number(simUrbanos) || 0;
+      const r = Number(simRurais) || 0;
+      const a = Number(simAutorizacoes) || 0;
+      const t = Number(simTermos) || 0;
+      await api.simulateRegulariza({
+        titulos_urbanos_entregues: u,
+        titulos_rurais_entregues: r,
+        autorizacoes_ocupacao_entregues: a,
+        termos_ocupacao_entregues: t,
+        total_entregues: u + r + a + t
+      });
+      toast.success('Simulação de indicadores gravada com sucesso!');
+      await fetchRegularizaStatus();
+    } catch (error: any) {
+      toast.error(error.message || 'Erro ao simular envio do REGULARIZA');
+    } finally {
+      setIsSimulating(false);
     }
   };
 
@@ -2444,6 +2492,18 @@ export default function App() {
                       <Settings className="w-4 h-4" />
                       CONFIGURAÇÕES
                     </button>
+                    {(user.role === 'admin' || user.role === 'editor') && (
+                      <button 
+                        onClick={() => {
+                          setAdminTab('regulariza');
+                          fetchRegularizaStatus();
+                        }}
+                        className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl font-bold text-xs transition-all ${adminTab === 'regulariza' ? 'bg-primary text-white shadow-lg shadow-primary/20' : 'text-secondary hover:bg-primary/5'}`}
+                      >
+                        <ShieldCheck className="w-4 h-4" />
+                        REGULARIZA
+                      </button>
+                    )}
                   </div>
                 )}
 
@@ -3497,6 +3557,279 @@ export default function App() {
                               </div>
                             ))}
                           </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {adminTab === 'regulariza' && (
+                  <div className="space-y-8">
+                    {/* Header Card */}
+                    <div className="bg-white p-8 rounded-3xl shadow-xl border border-primary/5">
+                      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-6 border-b border-primary/5">
+                        <div className="flex items-center gap-4">
+                          <div className="w-14 h-14 bg-primary/10 rounded-2xl flex items-center justify-center text-primary shadow-sm">
+                            <ShieldCheck className="w-7 h-7" />
+                          </div>
+                          <div>
+                            <span className="text-[10px] font-bold uppercase tracking-widest text-primary">Integração Externa</span>
+                            <h3 className="text-2xl font-black text-on-surface font-headline leading-none mt-0.5">
+                              Sistema REGULARIZA
+                            </h3>
+                            <p className="text-xs text-secondary mt-1">
+                              Recepção de indicadores agregados via HTTPS com assinatura HMAC SHA-256
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-2">
+                          <span className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                            Serviço de Recepção Ativo
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Webhook & Credentials Information */}
+                      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
+                        <div className="bg-surface-container-low p-6 rounded-2xl border border-primary/5 space-y-4">
+                          <div className="flex items-center justify-between">
+                            <span className="text-[10px] font-bold text-secondary uppercase tracking-widest">
+                              URL HTTPS de Recebimento
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const url = `${window.location.origin}/api/integracoes/regulariza/indicadores`;
+                                navigator.clipboard.writeText(url);
+                                setCopiedWebhookUrl(true);
+                                setTimeout(() => setCopiedWebhookUrl(false), 2000);
+                                toast.success('URL copiada para a área de transferência!');
+                              }}
+                              className="flex items-center gap-1.5 text-xs font-bold text-primary hover:text-primary-container transition-colors"
+                            >
+                              {copiedWebhookUrl ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
+                              <span>{copiedWebhookUrl ? 'Copiado!' : 'Copiar URL'}</span>
+                            </button>
+                          </div>
+                          <div className="bg-white p-3 rounded-xl border border-primary/10 font-mono text-xs text-on-surface break-all select-all">
+                            {window.location.origin}/api/integracoes/regulariza/indicadores
+                          </div>
+                          <p className="text-[11px] text-secondary leading-relaxed">
+                            Método <strong>POST</strong> com corpo JSON bruto. O servidor aceita requisições HTTPS originadas da rede interna do ITERAIMA sem restrição de IP.
+                          </p>
+                        </div>
+
+                        <div className="bg-surface-container-low p-6 rounded-2xl border border-primary/5 space-y-4">
+                          <div className="flex items-center justify-between">
+                            <span className="text-[10px] font-bold text-secondary uppercase tracking-widest">
+                              Chave Secreta HMAC (256 bits)
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const secret = regularizaStatus?.fullSecret || "c29d6092b3a0e5f41961e0bb51a94e82b7cf4f5d81bca6e17424ad9938c11e35";
+                                navigator.clipboard.writeText(secret);
+                                setCopiedSecret(true);
+                                setTimeout(() => setCopiedSecret(false), 2000);
+                                toast.success('Chave secreta copiada com sucesso!');
+                              }}
+                              className="flex items-center gap-1.5 text-xs font-bold text-primary hover:text-primary-container transition-colors"
+                            >
+                              {copiedSecret ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
+                              <span>{copiedSecret ? 'Copiada!' : 'Copiar Chave'}</span>
+                            </button>
+                          </div>
+                          <div className="bg-white p-3 rounded-xl border border-primary/10 font-mono text-xs text-on-surface break-all select-all">
+                            {regularizaStatus?.fullSecret || "c29d6092b3a0e5f41961e0bb51a94e82b7cf4f5d81bca6e17424ad9938c11e35"}
+                          </div>
+                          <p className="text-[11px] text-secondary leading-relaxed">
+                            A mesma chave está salva na variável <code className="bg-primary/10 px-1 py-0.5 rounded text-primary">REGULARIZA_WEBHOOK_SECRET</code> no <code className="bg-primary/10 px-1 py-0.5 rounded text-primary">.env</code> do site oficial.
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* Headers Instructions Box */}
+                      <div className="mt-6 p-6 rounded-2xl bg-emerald-50/70 border border-emerald-100 space-y-3">
+                        <div className="flex items-center gap-2 text-emerald-900 font-bold text-xs uppercase tracking-wider">
+                          <CheckCircle2 className="w-4 h-4 text-emerald-700" />
+                          Especificação dos Cabeçalhos HTTP
+                        </div>
+                        <ul className="text-xs text-emerald-900/90 space-y-2 list-disc list-inside">
+                          <li>
+                            <strong className="font-mono">X-Regulariza-Timestamp:</strong> Data/hora no padrão ISO-8601 (ex: <code className="bg-white px-1.5 py-0.5 rounded border border-emerald-200">2026-09-30T10:30:00-04:00</code>). O site recusa requisições com diferença superior a 5 minutos.
+                          </li>
+                          <li>
+                            <strong className="font-mono">X-Regulariza-Signature:</strong> Assinatura HMAC SHA-256 no formato <code className="bg-white px-1.5 py-0.5 rounded border border-emerald-200">sha256=&lt;hash_hexadecimal&gt;</code>, calculada a partir de <code className="bg-white px-1.5 py-0.5 rounded border border-emerald-200">timestamp + "." + corpo_json_exato</code>.
+                          </li>
+                        </ul>
+                      </div>
+                    </div>
+
+                    {/* Simulator and Test Form */}
+                    <div className="bg-white p-8 rounded-3xl shadow-xl border border-primary/5">
+                      <div className="flex items-center gap-4 mb-6">
+                        <div className="w-12 h-12 bg-primary/10 rounded-2xl flex items-center justify-center text-primary">
+                          <Database className="w-6 h-6" />
+                        </div>
+                        <div>
+                          <h3 className="text-2xl font-black text-on-surface font-headline leading-none">
+                            Simular Envio de Indicadores
+                          </h3>
+                          <p className="text-xs text-secondary mt-1">
+                            Envie dados de teste para registrar e verificar a exibição em tempo real nos cartões do portal
+                          </p>
+                        </div>
+                      </div>
+
+                      <form onSubmit={handleSimulateRegulariza} className="space-y-6">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                          <div>
+                            <label className="block text-[10px] font-bold text-secondary uppercase tracking-widest mb-1.5 ml-1">
+                              Títulos Urbanos
+                            </label>
+                            <input
+                              type="number"
+                              min="0"
+                              value={simUrbanos}
+                              onChange={(e) => setSimUrbanos(e.target.value)}
+                              className="w-full bg-surface-container-low border-none rounded-2xl px-4 py-3 text-sm focus:ring-2 focus:ring-primary font-bold"
+                              required
+                            />
+                          </div>
+
+                          <div>
+                            <label className="block text-[10px] font-bold text-secondary uppercase tracking-widest mb-1.5 ml-1">
+                              Títulos Rurais
+                            </label>
+                            <input
+                              type="number"
+                              min="0"
+                              value={simRurais}
+                              onChange={(e) => setSimRurais(e.target.value)}
+                              className="w-full bg-surface-container-low border-none rounded-2xl px-4 py-3 text-sm focus:ring-2 focus:ring-primary font-bold"
+                              required
+                            />
+                          </div>
+
+                          <div>
+                            <label className="block text-[10px] font-bold text-secondary uppercase tracking-widest mb-1.5 ml-1">
+                              Autorizações de Ocupação
+                            </label>
+                            <input
+                              type="number"
+                              min="0"
+                              value={simAutorizacoes}
+                              onChange={(e) => setSimAutorizacoes(e.target.value)}
+                              className="w-full bg-surface-container-low border-none rounded-2xl px-4 py-3 text-sm focus:ring-2 focus:ring-primary font-bold"
+                              required
+                            />
+                          </div>
+
+                          <div>
+                            <label className="block text-[10px] font-bold text-secondary uppercase tracking-widest mb-1.5 ml-1">
+                              Termos de Ocupação
+                            </label>
+                            <input
+                              type="number"
+                              min="0"
+                              value={simTermos}
+                              onChange={(e) => setSimTermos(e.target.value)}
+                              className="w-full bg-surface-container-low border-none rounded-2xl px-4 py-3 text-sm focus:ring-2 focus:ring-primary font-bold"
+                              required
+                            />
+                          </div>
+                        </div>
+
+                        <div className="flex items-center justify-between p-4 rounded-2xl bg-surface-container-low border border-primary/5">
+                          <span className="text-xs font-bold text-secondary uppercase tracking-wider">
+                            Total Calculado:
+                          </span>
+                          <span className="text-xl font-black text-primary font-headline">
+                            {((Number(simUrbanos) || 0) + (Number(simRurais) || 0) + (Number(simAutorizacoes) || 0) + (Number(simTermos) || 0)).toLocaleString('pt-BR')} unidades
+                          </span>
+                        </div>
+
+                        <button
+                          type="submit"
+                          disabled={isSimulating}
+                          className={`w-full ${isSimulating ? 'bg-gray-400' : 'bg-primary'} text-white font-bold py-4 rounded-2xl shadow-lg shadow-primary/20 active:scale-95 transition-all flex items-center justify-center gap-2 uppercase tracking-wider text-xs`}
+                        >
+                          {isSimulating ? (
+                            <>
+                              <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                              REGISTRANDO NO POSTGRESQL...
+                            </>
+                          ) : (
+                            <>
+                              <ShieldCheck className="w-4 h-4" />
+                              GRAVAR NO BANCO E ATUALIZAR INDICADORES
+                            </>
+                          )}
+                        </button>
+                      </form>
+                    </div>
+
+                    {/* History Table */}
+                    {regularizaStatus?.history && regularizaStatus.history.length > 0 && (
+                      <div className="bg-white p-8 rounded-3xl shadow-xl border border-primary/5">
+                        <div className="flex items-center justify-between mb-6">
+                          <div>
+                            <h3 className="text-xl font-black text-on-surface font-headline leading-none">
+                              Últimos Registros Gravados no PostgreSQL
+                            </h3>
+                            <p className="text-xs text-secondary mt-1">Histórico das últimas transmissões recebidas</p>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={fetchRegularizaStatus}
+                            disabled={isLoadingRegularizaStatus}
+                            className="text-xs font-bold text-primary hover:underline"
+                          >
+                            Recarregar Histórico
+                          </button>
+                        </div>
+
+                        <div className="overflow-x-auto">
+                          <table className="w-full text-left text-xs">
+                            <thead>
+                              <tr className="border-b border-primary/10 text-secondary uppercase text-[10px] tracking-wider">
+                                <th className="py-3 px-2">ID</th>
+                                <th className="py-3 px-2">Fonte</th>
+                                <th className="py-3 px-2">Recebido Em</th>
+                                <th className="py-3 px-2">Gerado Em</th>
+                                <th className="py-3 px-2 text-right">Urbanos</th>
+                                <th className="py-3 px-2 text-right">Rurais</th>
+                                <th className="py-3 px-2 text-right">Autorizações</th>
+                                <th className="py-3 px-2 text-right">Termos</th>
+                                <th className="py-3 px-2 text-right font-black">Total</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-primary/5">
+                              {regularizaStatus.history.map((h, i) => (
+                                <tr key={h.id || i} className="hover:bg-surface-container-low/50 transition-colors">
+                                  <td className="py-3 px-2 font-mono text-primary font-bold">#{h.id}</td>
+                                  <td className="py-3 px-2">
+                                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-primary/10 text-primary">
+                                      {h.fonte}
+                                    </span>
+                                  </td>
+                                  <td className="py-3 px-2 font-medium">
+                                    {h.recebido_em ? new Date(h.recebido_em).toLocaleString('pt-BR') : '-'}
+                                  </td>
+                                  <td className="py-3 px-2 text-secondary">
+                                    {h.gerado_em ? new Date(h.gerado_em).toLocaleString('pt-BR') : '-'}
+                                  </td>
+                                  <td className="py-3 px-2 text-right font-semibold">{h.titulos_urbanos_entregues.toLocaleString('pt-BR')}</td>
+                                  <td className="py-3 px-2 text-right font-semibold">{h.titulos_rurais_entregues.toLocaleString('pt-BR')}</td>
+                                  <td className="py-3 px-2 text-right font-semibold">{h.autorizacoes_ocupacao_entregues.toLocaleString('pt-BR')}</td>
+                                  <td className="py-3 px-2 text-right font-semibold">{h.termos_ocupacao_entregues.toLocaleString('pt-BR')}</td>
+                                  <td className="py-3 px-2 text-right font-black text-primary">{h.total_entregues.toLocaleString('pt-BR')}</td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
                         </div>
                       </div>
                     )}

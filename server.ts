@@ -9,6 +9,7 @@ import dotenv from "dotenv";
 import multer from "multer";
 import fs from "fs";
 import OpenAI from "openai";
+import crypto from "crypto";
 
 dotenv.config();
 
@@ -146,7 +147,34 @@ async function startServer() {
   const PORT = 3000;
 
   app.use(cors());
-  app.use(express.json());
+
+  // Rota do webhook REGULARIZA: captura exata do payload bruto em Buffer/string para HMAC SHA-256
+  app.use('/api/integracoes/regulariza/indicadores', express.raw({ type: '*/*', limit: '10mb' }), (req: any, _res, next) => {
+    if (Buffer.isBuffer(req.body)) {
+      req.rawBody = req.body.toString('utf8');
+      try {
+        req.parsedBody = JSON.parse(req.rawBody);
+      } catch {
+        req.parsedBody = null;
+      }
+    } else if (typeof req.body === 'string') {
+      req.rawBody = req.body;
+      try {
+        req.parsedBody = JSON.parse(req.rawBody);
+      } catch {
+        req.parsedBody = null;
+      }
+    }
+    next();
+  });
+
+  app.use(express.json({
+    verify: (req: any, _res, buf) => {
+      if (!req.rawBody && buf) {
+        req.rawBody = buf.toString('utf8');
+      }
+    }
+  }));
   app.use("/uploads", express.static(uploadDir));
 
   // Multer Configuration
@@ -763,11 +791,257 @@ async function startServer() {
     }
   });
 
+  // ==========================================
+  // INTEGRAÇÃO REGULARIZA (INDICADORES DE TITULAÇÃO)
+  // ==========================================
+
+  interface IndicadoresRecord {
+    id: number;
+    versao: number;
+    fonte: string;
+    gerado_em: string | null;
+    recebido_em: string | null;
+    titulos_urbanos_entregues: number;
+    titulos_rurais_entregues: number;
+    autorizacoes_ocupacao_entregues: number;
+    termos_ocupacao_entregues: number;
+    total_entregues: number;
+    raw_data?: any;
+    status?: string;
+  }
+
+  let latestIndicadoresCache: IndicadoresRecord = {
+    id: 1,
+    versao: 1,
+    fonte: "REGULARIZA",
+    gerado_em: new Date().toISOString(),
+    recebido_em: new Date().toISOString(),
+    titulos_urbanos_entregues: 2840,
+    titulos_rurais_entregues: 6120,
+    autorizacoes_ocupacao_entregues: 1450,
+    termos_ocupacao_entregues: 930,
+    total_entregues: 11340,
+    status: "ativo"
+  };
+  let indicadoresHistoryCache: IndicadoresRecord[] = [latestIndicadoresCache];
+
+  /**
+   * Rota privada para receber do sistema interno REGULARIZA:
+   * POST /api/integracoes/regulariza/indicadores
+   * Headers obrigatórios:
+   *   - X-Regulariza-Timestamp
+   *   - X-Regulariza-Signature: sha256=<hex_digest>
+   * Assinatura: HMAC-SHA256(timestamp + "." + rawBody, secret)
+   */
+  app.post("/api/integracoes/regulariza/indicadores", async (req: any, res) => {
+    try {
+      const timestampHeader = (req.header('x-regulariza-timestamp') || req.header('X-Regulariza-Timestamp') || '').trim();
+      const signatureHeader = (req.header('x-regulariza-signature') || req.header('X-Regulariza-Signature') || '').trim();
+
+      if (!timestampHeader) {
+        return res.status(400).json({
+          error: "Header X-Regulariza-Timestamp ausente",
+          mensagem: "É obrigatório enviar o header X-Regulariza-Timestamp com a data/hora da requisição."
+        });
+      }
+
+      if (!signatureHeader) {
+        return res.status(401).json({
+          error: "Header X-Regulariza-Signature ausente",
+          mensagem: "É obrigatório enviar o header X-Regulariza-Signature no formato sha256=<assinatura_hmac>."
+        });
+      }
+
+      // Validar timestamp (recusar se diferença superior a 5 minutos)
+      let requestTimeMs: number;
+      if (/^\d+$/.test(timestampHeader)) {
+        const num = parseInt(timestampHeader, 10);
+        requestTimeMs = num > 1e11 ? num : num * 1000;
+      } else {
+        requestTimeMs = Date.parse(timestampHeader);
+      }
+
+      if (isNaN(requestTimeMs)) {
+        return res.status(400).json({
+          error: "Header X-Regulariza-Timestamp com formato inválido",
+          detalhes: "Use formato ISO-8601 (ex: 2026-09-30T10:30:00-04:00) ou Unix Epoch em milissegundos."
+        });
+      }
+
+      const diffMs = Math.abs(Date.now() - requestTimeMs);
+      const FIVE_MINUTES_MS = 5 * 60 * 1000;
+      if (diffMs > FIVE_MINUTES_MS) {
+        return res.status(401).json({
+          error: "Timestamp fora da janela permitida",
+          mensagem: "Requisição expirada. A diferença de timestamp é superior a 5 minutos.",
+          diferenca_segundos: Math.round(diffMs / 1000),
+          limite_segundos: 300
+        });
+      }
+
+      // Obter o corpo exato da requisição para cálculo do HMAC
+      const rawBody = req.rawBody !== undefined 
+        ? req.rawBody 
+        : (typeof req.body === 'string' ? req.body : JSON.stringify(req.body || {}));
+
+      // Extrair a assinatura recebida (aceita com ou sem prefixo 'sha256=')
+      let receivedSignature = signatureHeader;
+      if (receivedSignature.toLowerCase().startsWith('sha256=')) {
+        receivedSignature = receivedSignature.substring(7).trim();
+      }
+
+      // Chave secreta configurada no .env
+      const secret = process.env.REGULARIZA_WEBHOOK_SECRET || "c29d6092b3a0e5f41961e0bb51a94e82b7cf4f5d81bca6e17424ad9938c11e35";
+
+      // Recalcular HMAC SHA-256 usando timestamp + "." + corpo_json_exato
+      const payloadToSign = `${timestampHeader}.${rawBody}`;
+      const expectedSignature = crypto
+        .createHmac("sha256", secret)
+        .update(payloadToSign)
+        .digest("hex");
+
+      // Comparação timing-safe para evitar timing attacks
+      let signaturesMatch = false;
+      try {
+        const bufA = Buffer.from(receivedSignature.toLowerCase(), "hex");
+        const bufB = Buffer.from(expectedSignature.toLowerCase(), "hex");
+        if (bufA.length === bufB.length && crypto.timingSafeEqual(bufA, bufB)) {
+          signaturesMatch = true;
+        }
+      } catch {
+        signaturesMatch = false;
+      }
+
+      if (!signaturesMatch) {
+        console.warn(`[REGULARIZA] Falha de assinatura HMAC. Enviada: ${receivedSignature.substring(0, 10)}...`);
+        return res.status(401).json({
+          error: "Assinatura HMAC SHA-256 inválida",
+          mensagem: "A assinatura fornecida em X-Regulariza-Signature não confere com a chave secreta."
+        });
+      }
+
+      // Fazer o parse do JSON do payload
+      let parsedData = req.parsedBody;
+      if (!parsedData) {
+        try {
+          parsedData = typeof req.body === 'object' && req.body !== null ? req.body : JSON.parse(rawBody);
+        } catch {
+          return res.status(400).json({ error: "Corpo da requisição não é um JSON válido" });
+        }
+      }
+
+      const {
+        versao = 1,
+        fonte = "REGULARIZA",
+        gerado_em,
+        titulos_urbanos_entregues = 0,
+        titulos_rurais_entregues = 0,
+        autorizacoes_ocupacao_entregues = 0,
+        termos_ocupacao_entregues = 0,
+        total_entregues
+      } = parsedData;
+
+      const numUrbanos = Number(titulos_urbanos_entregues) || 0;
+      const numRurais = Number(titulos_rurais_entregues) || 0;
+      const numAutorizacoes = Number(autorizacoes_ocupacao_entregues) || 0;
+      const numTermos = Number(termos_ocupacao_entregues) || 0;
+      const numTotal = total_entregues !== undefined
+        ? (Number(total_entregues) || 0)
+        : (numUrbanos + numRurais + numAutorizacoes + numTermos);
+
+      let geradoEmDate = new Date();
+      if (gerado_em) {
+        const d = new Date(gerado_em);
+        if (!isNaN(d.getTime())) geradoEmDate = d;
+      }
+
+      // Gravar no PostgreSQL o resumo recebido com gerado_em e recebido_em
+      let saved: any = null;
+      try {
+        const { rows } = await pool.query(
+          `INSERT INTO indicadores_titulacao (
+            versao, fonte, gerado_em, recebido_em,
+            titulos_urbanos_entregues, titulos_rurais_entregues,
+            autorizacoes_ocupacao_entregues, termos_ocupacao_entregues,
+            total_entregues, raw_data
+          ) VALUES ($1, $2, $3, CURRENT_TIMESTAMP, $4, $5, $6, $7, $8, $9)
+          RETURNING *`,
+          [
+            versao,
+            fonte,
+            geradoEmDate,
+            numUrbanos,
+            numRurais,
+            numAutorizacoes,
+            numTermos,
+            numTotal,
+            JSON.stringify(parsedData)
+          ]
+        );
+        saved = rows[0];
+      } catch (dbErr: any) {
+        console.warn("[REGULARIZA] Aviso ao gravar no PostgreSQL:", dbErr.message);
+      }
+
+      if (!saved) {
+        saved = {
+          id: (indicadoresHistoryCache[0]?.id || 0) + 1,
+          versao,
+          fonte,
+          gerado_em: geradoEmDate.toISOString(),
+          recebido_em: new Date().toISOString(),
+          titulos_urbanos_entregues: numUrbanos,
+          titulos_rurais_entregues: numRurais,
+          autorizacoes_ocupacao_entregues: numAutorizacoes,
+          termos_ocupacao_entregues: numTermos,
+          total_entregues: numTotal
+        };
+      }
+
+      latestIndicadoresCache = {
+        id: saved.id,
+        versao: Number(saved.versao) || 1,
+        fonte: saved.fonte || "REGULARIZA",
+        gerado_em: saved.gerado_em ? new Date(saved.gerado_em).toISOString() : null,
+        recebido_em: saved.recebido_em ? new Date(saved.recebido_em).toISOString() : new Date().toISOString(),
+        titulos_urbanos_entregues: Number(saved.titulos_urbanos_entregues) || 0,
+        titulos_rurais_entregues: Number(saved.titulos_rurais_entregues) || 0,
+        autorizacoes_ocupacao_entregues: Number(saved.autorizacoes_ocupacao_entregues) || 0,
+        termos_ocupacao_entregues: Number(saved.termos_ocupacao_entregues) || 0,
+        total_entregues: Number(saved.total_entregues) || 0,
+        status: "ativo"
+      };
+      indicadoresHistoryCache = [latestIndicadoresCache, ...indicadoresHistoryCache.filter(h => h.id !== latestIndicadoresCache.id).slice(0, 9)];
+
+      console.log(`[REGULARIZA] Novos indicadores validados e gravados com sucesso. ID: ${saved.id}`);
+
+      return res.status(200).json({
+        sucesso: true,
+        mensagem: "Indicadores validados e armazenados com sucesso.",
+        id: saved.id,
+        gerado_em: saved.gerado_em,
+        recebido_em: saved.recebido_em,
+        total_entregues: saved.total_entregues
+      });
+    } catch (error: any) {
+      console.error("[REGULARIZA] Erro no processamento do webhook:", error);
+      return res.status(500).json({
+        error: "Erro interno no servidor ao processar indicadores",
+        detalhes: error.message
+      });
+    }
+  });
+
+  /**
+   * Rota pública somente de leitura:
+   * GET /api/indicadores-titulacao
+   */
   app.get("/api/indicadores-titulacao", async (_req, res) => {
     try {
       const { rows } = await pool.query(
         "SELECT * FROM indicadores_titulacao ORDER BY recebido_em DESC, id DESC LIMIT 1"
       );
+
       if (rows && rows.length > 0) {
         const item = rows[0];
         return res.json({
@@ -785,21 +1059,117 @@ async function startServer() {
         });
       }
     } catch (err: any) {
-      // Ignora erro se DB não conectado
+      // Falha de banco usa o cache em memória
     }
-    return res.json({
-      id: 1,
+
+    return res.json(latestIndicadoresCache);
+  });
+
+  /**
+   * Rotas administrativas para acompanhar e simular o webhook REGULARIZA
+   */
+  app.get("/api/admin/regulariza/status", authenticateToken, async (req: any, res) => {
+    if (req.user.role !== 'admin' && req.user.role !== 'editor') return res.sendStatus(403);
+    const secret = process.env.REGULARIZA_WEBHOOK_SECRET || "c29d6092b3a0e5f41961e0bb51a94e82b7cf4f5d81bca6e17424ad9938c11e35";
+    
+    let history: any[] = [];
+    try {
+      const { rows } = await pool.query(
+        "SELECT id, versao, fonte, gerado_em, recebido_em, titulos_urbanos_entregues, titulos_rurais_entregues, autorizacoes_ocupacao_entregues, termos_ocupacao_entregues, total_entregues FROM indicadores_titulacao ORDER BY recebido_em DESC, id DESC LIMIT 5"
+      );
+      if (rows && rows.length > 0) {
+        history = rows;
+      }
+    } catch (err: any) {
+      history = indicadoresHistoryCache;
+    }
+
+    if (history.length === 0) {
+      history = indicadoresHistoryCache;
+    }
+
+    res.json({
+      configured: true,
+      webhookUrl: "/api/integracoes/regulariza/indicadores",
+      secretConfigured: !!secret,
+      maskedSecret: secret.substring(0, 8) + "..." + secret.substring(secret.length - 8),
+      fullSecret: req.user.role === 'admin' ? secret : undefined,
+      history
+    });
+  });
+
+  app.post("/api/admin/regulariza/simulate", authenticateToken, async (req: any, res) => {
+    if (req.user.role !== 'admin' && req.user.role !== 'editor') return res.sendStatus(403);
+    const { 
+      titulos_urbanos_entregues = 2840,
+      titulos_rurais_entregues = 6120,
+      autorizacoes_ocupacao_entregues = 1450,
+      termos_ocupacao_entregues = 930,
+      total_entregues
+    } = req.body;
+
+    const payload = {
       versao: 1,
       fonte: "REGULARIZA",
       gerado_em: new Date().toISOString(),
-      recebido_em: new Date().toISOString(),
-      titulos_urbanos_entregues: 2840,
-      titulos_rurais_entregues: 6120,
-      autorizacoes_ocupacao_entregues: 1450,
-      termos_ocupacao_entregues: 930,
-      total_entregues: 11340,
+      titulos_urbanos_entregues: Number(titulos_urbanos_entregues) || 0,
+      titulos_rurais_entregues: Number(titulos_rurais_entregues) || 0,
+      autorizacoes_ocupacao_entregues: Number(autorizacoes_ocupacao_entregues) || 0,
+      termos_ocupacao_entregues: Number(termos_ocupacao_entregues) || 0,
+      total_entregues: total_entregues !== undefined ? Number(total_entregues) : (Number(titulos_urbanos_entregues) + Number(titulos_rurais_entregues) + Number(autorizacoes_ocupacao_entregues) + Number(termos_ocupacao_entregues))
+    };
+
+    let savedRow: any = null;
+    try {
+      const { rows } = await pool.query(
+        `INSERT INTO indicadores_titulacao (
+          versao, fonte, gerado_em, recebido_em,
+          titulos_urbanos_entregues, titulos_rurais_entregues,
+          autorizacoes_ocupacao_entregues, termos_ocupacao_entregues,
+          total_entregues, raw_data
+        ) VALUES ($1, $2, $3, CURRENT_TIMESTAMP, $4, $5, $6, $7, $8, $9)
+        RETURNING *`,
+        [
+          payload.versao,
+          payload.fonte,
+          new Date(payload.gerado_em),
+          payload.titulos_urbanos_entregues,
+          payload.titulos_rurais_entregues,
+          payload.autorizacoes_ocupacao_entregues,
+          payload.termos_ocupacao_entregues,
+          payload.total_entregues,
+          JSON.stringify(payload)
+        ]
+      );
+      savedRow = rows[0];
+    } catch (err: any) {
+      // Ignora erro se DB não conectado em dev
+    }
+
+    if (!savedRow) {
+      savedRow = {
+        id: (indicadoresHistoryCache[0]?.id || 0) + 1,
+        ...payload,
+        recebido_em: new Date().toISOString()
+      };
+    }
+
+    latestIndicadoresCache = {
+      id: savedRow.id,
+      versao: Number(savedRow.versao) || 1,
+      fonte: savedRow.fonte || "REGULARIZA",
+      gerado_em: savedRow.gerado_em ? new Date(savedRow.gerado_em).toISOString() : new Date().toISOString(),
+      recebido_em: savedRow.recebido_em ? new Date(savedRow.recebido_em).toISOString() : new Date().toISOString(),
+      titulos_urbanos_entregues: Number(savedRow.titulos_urbanos_entregues) || 0,
+      titulos_rurais_entregues: Number(savedRow.titulos_rurais_entregues) || 0,
+      autorizacoes_ocupacao_entregues: Number(savedRow.autorizacoes_ocupacao_entregues) || 0,
+      termos_ocupacao_entregues: Number(savedRow.termos_ocupacao_entregues) || 0,
+      total_entregues: Number(savedRow.total_entregues) || 0,
       status: "ativo"
-    });
+    };
+    indicadoresHistoryCache = [latestIndicadoresCache, ...indicadoresHistoryCache.filter(h => h.id !== latestIndicadoresCache.id).slice(0, 9)];
+
+    res.json({ message: "Simulação executada com sucesso", registro: savedRow });
   });
 
   // Vite middleware for development
