@@ -4221,6 +4221,7 @@ export default function App() {
           presidencia={presidencia}
           diretorias={diretorias}
           galeria={galeria}
+          logoUrl={logoUrl}
         />
       </React.Suspense>
       
