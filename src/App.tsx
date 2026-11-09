@@ -1608,12 +1608,9 @@ export default function App() {
                 <h1 className="text-4xl font-extrabold text-white font-headline leading-tight tracking-tight mb-4">
                   Instituto de Terras e Colonização de Roraima
                 </h1>
-                <p className="text-white/80 text-sm leading-relaxed mb-6 max-w-md">
+                <p className="text-white/80 text-sm leading-relaxed max-w-md">
                   Trabalhando na regularização fundiária e no desenvolvimento sustentável do nosso estado, garantindo segurança jurídica ao produtor.
                 </p>
-                <button className="bg-surface-container-lowest text-primary px-8 py-3 rounded-full font-bold text-sm shadow-xl active:scale-95 transition-all hover:bg-surface-bright">
-                  Consultar Processo
-                </button>
               </motion.div>
             </section>
 
