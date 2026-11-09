@@ -1554,7 +1554,7 @@ export default function App() {
       </AnimatePresence>
 
       {/* TopAppBar */}
-      <header className="fixed top-0 md:top-[34px] w-full z-50 bg-background/80 backdrop-blur-xl shadow-[0_8px_32px_rgba(0,34,2,0.06)] flex justify-between items-center px-6 h-16">
+      <header className="sticky top-0 w-full z-50 bg-background/95 backdrop-blur-xl shadow-[0_8px_32px_rgba(0,34,2,0.06)] flex justify-between items-center px-6 h-16">
         <div 
           onClick={() => setIsSidebarOpen(true)}
           className="flex items-center gap-3 active:scale-95 duration-200 cursor-pointer"
@@ -1574,7 +1574,7 @@ export default function App() {
         </div>
       </header>
 
-      <main className="pt-16 md:pt-[98px]">
+      <main className="relative">
         {currentPage === 'home' && (
           <motion.div
             initial={{ opacity: 0 }}
@@ -1582,7 +1582,7 @@ export default function App() {
             exit={{ opacity: 0 }}
           >
             {/* Hero Section */}
-            <section className="relative h-[480px] w-full flex items-end p-8 overflow-hidden">
+            <section className="relative min-h-[500px] md:min-h-[560px] w-full flex items-end p-6 md:p-10 pb-24 md:pb-28 overflow-hidden">
               <div className="absolute inset-0 z-0">
                 <a href={coverPhotoUrl} target="_blank" rel="noopener noreferrer" className="block w-full h-full group">
                   <img 
@@ -1591,7 +1591,7 @@ export default function App() {
                     alt="Aerial view of Roraima rainforest"
                     referrerPolicy="no-referrer"
                   />
-                  <div className="absolute inset-0 bg-gradient-to-t from-primary/90 via-primary/30 to-transparent"></div>
+                  <div className="absolute inset-0 bg-gradient-to-t from-primary/95 via-primary/45 to-transparent"></div>
                   <div className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity bg-white/20 backdrop-blur-md p-2 rounded-full">
                     <ExternalLink className="text-white w-4 h-4" />
                   </div>
@@ -1600,22 +1600,22 @@ export default function App() {
               <motion.div 
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
-                className="relative z-10 max-w-xl"
+                className="relative z-10 max-w-xl mb-2"
               >
-                <span className="inline-block px-3 py-1 bg-primary-container text-on-primary text-[10px] font-bold uppercase tracking-widest rounded-full mb-4">
+                <span className="inline-block px-3 py-1 bg-primary-container text-on-primary text-[10px] font-bold uppercase tracking-widest rounded-full mb-3 shadow-sm">
                   Governo de Roraima
                 </span>
-                <h1 className="text-4xl font-extrabold text-white font-headline leading-tight tracking-tight mb-4">
+                <h1 className="text-3xl md:text-5xl font-extrabold text-white font-headline leading-tight tracking-tight mb-4 drop-shadow-sm">
                   Instituto de Terras e Colonização de Roraima
                 </h1>
-                <p className="text-white/80 text-sm leading-relaxed max-w-md">
+                <p className="text-white/95 text-sm md:text-base leading-relaxed max-w-lg drop-shadow-sm font-medium">
                   Trabalhando na regularização fundiária e no desenvolvimento sustentável do nosso estado, garantindo segurança jurídica ao produtor.
                 </p>
               </motion.div>
             </section>
 
             {/* Service Grid */}
-            <section className="px-6 -mt-12 relative z-20">
+            <section className="px-6 -mt-10 md:-mt-12 relative z-20">
               <div className="grid grid-cols-2 gap-4">
                 {/* Transparência */}
                 <div className="relative">
