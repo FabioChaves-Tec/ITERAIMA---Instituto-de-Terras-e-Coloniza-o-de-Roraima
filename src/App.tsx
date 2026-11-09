@@ -68,8 +68,8 @@ const AiAssistant = React.lazy(() => import('./components/AiAssistant').then(m =
 const IMAGES = {
   logo: 'https://iteraimacidadao.rr.gov.br/cadastrousuarioexterno/include/images/marca/logo_iteraima.png',
   hero: 'https://st2.depositphotos.com/1482106/12327/i/450/depositphotos_123270174-stock-photo-waving-flag-of-roraima-state.jpg',
-  news1: 'https://images.unsplash.com/photo-1450101499163-c8848c66ca85?auto=format&fit=crop&q=80&w=800',
-  news2: 'https://images.unsplash.com/photo-1500382017468-9049fed747ef?auto=format&fit=crop&q=80&w=800',
+  news1: 'https://images.unsplash.com/photo-1450101499163-c8848c66ca85?auto=format&fit=crop&q=80&w=1080&h=1350',
+  news2: 'https://images.unsplash.com/photo-1500382017468-9049fed747ef?auto=format&fit=crop&q=80&w=1080&h=1350',
 };
 
 const DEFAULT_TRANSPARENCIA_NODES: MenuNode[] = [
@@ -206,6 +206,76 @@ const stripHtml = (html: string) => {
 const normalizeStr = (str: string | undefined | null) => {
   if (!str) return "";
   return str.trim().toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+};
+
+// Padronização de Imagens de Notícias para 1080 x 1350 px (4:5)
+const formatImageTo1080x1350 = (file: File): Promise<File> => {
+  return new Promise((resolve) => {
+    if (!file.type.startsWith('image/')) {
+      resolve(file);
+      return;
+    }
+
+    const img = new window.Image();
+    const objectUrl = URL.createObjectURL(file);
+    img.onload = () => {
+      URL.revokeObjectURL(objectUrl);
+      const targetWidth = 1080;
+      const targetHeight = 1350;
+      const targetRatio = targetWidth / targetHeight; // 0.8
+      const imgRatio = img.width / img.height;
+
+      const canvas = document.createElement('canvas');
+      canvas.width = targetWidth;
+      canvas.height = targetHeight;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) {
+        resolve(file);
+        return;
+      }
+
+      ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingQuality = 'high';
+
+      let renderWidth = targetWidth;
+      let renderHeight = targetHeight;
+      let offsetX = 0;
+      let offsetY = 0;
+
+      if (imgRatio > targetRatio) {
+        // Imagem mais larga que 4:5: ajusta altura e centraliza corte horizontal
+        renderHeight = targetHeight;
+        renderWidth = img.width * (targetHeight / img.height);
+        offsetX = (targetWidth - renderWidth) / 2;
+      } else {
+        // Imagem mais alta que 4:5: ajusta largura e centraliza corte vertical
+        renderWidth = targetWidth;
+        renderHeight = img.height * (targetWidth / img.width);
+        offsetY = (targetHeight - renderHeight) / 2;
+      }
+
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0, 0, targetWidth, targetHeight);
+      ctx.drawImage(img, offsetX, offsetY, renderWidth, renderHeight);
+
+      canvas.toBlob((blob) => {
+        if (blob) {
+          const standardizedFile = new (window as any).File([blob], `${file.name.replace(/\.[^.]+$/, '')}-1080x1350.jpg`, {
+            type: 'image/jpeg',
+            lastModified: Date.now()
+          }) as File;
+          resolve(standardizedFile);
+        } else {
+          resolve(file);
+        }
+      }, 'image/jpeg', 0.92);
+    };
+    img.onerror = () => {
+      URL.revokeObjectURL(objectUrl);
+      resolve(file);
+    };
+    img.src = objectUrl;
+  });
 };
 
 // ITERAIMA Portal - v1.0.3 - Triggering sync refresh
@@ -648,6 +718,21 @@ export default function App() {
       } catch (err) {
         toast.error('Erro ao copiar link');
       }
+    }
+  };
+
+  const handleNewsImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    try {
+      toast.loading('Padronizando imagem para 1080 x 1350...', { id: 'img-padrao' });
+      const formatted = await formatImageTo1080x1350(file);
+      setNewImageFile(formatted);
+      toast.success('Imagem padronizada para 1080 x 1350 px com sucesso!', { id: 'img-padrao' });
+    } catch (err) {
+      console.error('Erro ao padronizar imagem:', err);
+      setNewImageFile(file);
+      toast.dismiss('img-padrao');
     }
   };
 
@@ -1970,13 +2055,13 @@ export default function App() {
                 </button>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
                 {isLoading ? (
                   <div className="flex justify-center py-12 col-span-full">
                     <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
                   </div>
                 ) : newsList.length > 0 ? (
-                  newsList.slice(0, 2).map((news) => (
+                  newsList.slice(0, 3).map((news) => (
                     <article 
                       key={news.id} 
                       onClick={() => {
@@ -1984,11 +2069,11 @@ export default function App() {
                         setCurrentPage('news-detail');
                         scrollToTop();
                       }}
-                      className="group cursor-pointer bg-white rounded-3xl overflow-hidden shadow-sm hover:shadow-xl transition-all border border-primary/5"
+                      className="group cursor-pointer bg-white rounded-3xl overflow-hidden shadow-sm hover:shadow-xl transition-all border border-primary/5 flex flex-col"
                     >
-                      <div className="relative aspect-[16/10] overflow-hidden">
+                      <div className="relative aspect-[4/5] w-full overflow-hidden bg-surface-container-low">
                         <img 
-                          className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" 
+                          className="w-full h-full object-cover object-center transition-transform duration-500 group-hover:scale-105" 
                           src={news.image_url || IMAGES.news1} 
                           alt={news.title}
                           referrerPolicy="no-referrer"
@@ -1997,14 +2082,16 @@ export default function App() {
                           <span className="px-3 py-1 bg-white/90 glass text-primary text-[10px] font-bold rounded-full uppercase tracking-widest">{news.category}</span>
                         </div>
                       </div>
-                      <div className="p-6 space-y-3">
-                        <div className="flex items-center gap-2 text-[10px] text-secondary font-bold uppercase tracking-widest">
-                          <Calendar className="w-3 h-3" />
-                          <span>{new Date(news.created_at!).toLocaleDateString('pt-BR')}</span>
+                      <div className="p-6 space-y-3 flex-1 flex flex-col justify-between">
+                        <div>
+                          <div className="flex items-center gap-2 text-[10px] text-secondary font-bold uppercase tracking-widest mb-2">
+                            <Calendar className="w-3 h-3" />
+                            <span>{new Date(news.created_at!).toLocaleDateString('pt-BR')}</span>
+                          </div>
+                          <h3 className="text-xl font-black text-on-surface font-headline leading-tight group-hover:text-primary transition-colors line-clamp-2">
+                            {news.title}
+                          </h3>
                         </div>
-                        <h3 className="text-xl font-black text-on-surface font-headline leading-tight group-hover:text-primary transition-colors line-clamp-2">
-                          {news.title}
-                        </h3>
                         <p className="text-sm text-secondary leading-relaxed line-clamp-2">
                           {stripHtml(news.content)}
                         </p>
@@ -2036,7 +2123,7 @@ export default function App() {
                 <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
               </div>
             ) : (
-              <div className="grid gap-8">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
                 {newsList.map((news) => (
                   <article 
                     key={news.id} 
@@ -2045,13 +2132,13 @@ export default function App() {
                       setCurrentPage('news-detail');
                       scrollToTop();
                     }}
-                    className="bg-white rounded-3xl overflow-hidden shadow-sm border border-primary/5 group cursor-pointer"
+                    className="bg-white rounded-3xl overflow-hidden shadow-sm hover:shadow-xl transition-all border border-primary/5 group cursor-pointer flex flex-col"
                   >
-                    <div className="relative aspect-[16/9]">
+                    <div className="relative aspect-[4/5] w-full overflow-hidden bg-surface-container-low">
                       <img 
                         src={news.image_url || IMAGES.news1} 
                         alt={news.title}
-                        className="w-full h-full object-cover"
+                        className="w-full h-full object-cover object-center transition-transform duration-500 group-hover:scale-105"
                         referrerPolicy="no-referrer"
                       />
                       <div className="absolute top-4 left-4">
@@ -2060,55 +2147,57 @@ export default function App() {
                         </span>
                       </div>
                     </div>
-                    <div className="p-6">
-                      <div className="flex items-center justify-between mb-3">
-                        <div className="flex items-center gap-2 text-[10px] text-secondary font-medium uppercase tracking-wider">
-                          <Calendar className="w-3 h-3" />
-                          <span>
-                            {new Date(news.created_at).toLocaleDateString('pt-BR')}
-                          </span>
-                        </div>
-                        {user && (user.role === 'admin' || user.role === 'editor') && (
-                          <div className="flex items-center gap-2">
-                            {deletingId === news.id ? (
-                              <div className="flex items-center gap-1">
-                                <button 
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleDeleteNews(news.id);
-                                  }}
-                                  className="px-3 py-1 bg-red-500 text-white text-[10px] font-bold rounded-lg hover:bg-red-600 transition-colors"
-                                >
-                                  CONFIRMAR
-                                </button>
-                                <button 
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    setDeletingId(null);
-                                  }}
-                                  className="px-3 py-1 bg-gray-200 text-gray-600 text-[10px] font-bold rounded-lg hover:bg-gray-300 transition-colors"
-                                >
-                                  CANCELAR
-                                </button>
-                              </div>
-                            ) : (
-                              <button 
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setDeletingId(news.id);
-                                }}
-                                className="p-2 text-red-500 hover:bg-red-50 rounded-full transition-colors"
-                                title="Excluir notícia"
-                              >
-                                <Trash2 className="w-4 h-4" />
-                              </button>
-                            )}
+                    <div className="p-6 flex-1 flex flex-col justify-between">
+                      <div>
+                        <div className="flex items-center justify-between mb-3">
+                          <div className="flex items-center gap-2 text-[10px] text-secondary font-medium uppercase tracking-wider">
+                            <Calendar className="w-3 h-3" />
+                            <span>
+                              {new Date(news.created_at).toLocaleDateString('pt-BR')}
+                            </span>
                           </div>
-                        )}
+                          {user && (user.role === 'admin' || user.role === 'editor') && (
+                            <div className="flex items-center gap-2">
+                              {deletingId === news.id ? (
+                                <div className="flex items-center gap-1">
+                                  <button 
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleDeleteNews(news.id);
+                                    }}
+                                    className="px-3 py-1 bg-red-500 text-white text-[10px] font-bold rounded-lg hover:bg-red-600 transition-colors"
+                                  >
+                                    CONFIRMAR
+                                  </button>
+                                  <button 
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setDeletingId(null);
+                                    }}
+                                    className="px-3 py-1 bg-gray-200 text-gray-600 text-[10px] font-bold rounded-lg hover:bg-gray-300 transition-colors"
+                                  >
+                                    CANCELAR
+                                  </button>
+                                </div>
+                              ) : (
+                                <button 
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setDeletingId(news.id);
+                                  }}
+                                  className="p-2 text-red-500 hover:bg-red-50 rounded-full transition-colors"
+                                  title="Excluir notícia"
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </button>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                        <h3 className="text-xl font-bold text-on-surface font-headline mb-3 group-hover:text-primary transition-colors">
+                          {news.title}
+                        </h3>
                       </div>
-                      <h3 className="text-xl font-bold text-on-surface font-headline mb-3 group-hover:text-primary transition-colors">
-                        {news.title}
-                      </h3>
                       <div 
                         className="text-sm text-on-surface-variant leading-relaxed line-clamp-3 quill-content"
                         dangerouslySetInnerHTML={{ __html: news.content }}
@@ -2141,18 +2230,20 @@ export default function App() {
               Voltar para Início
             </button>
 
-            <article className="bg-white rounded-[40px] overflow-hidden shadow-2xl shadow-primary/5 border border-primary/5">
-              <div className="relative aspect-[16/9] md:aspect-[21/9]">
-                <img 
-                  src={selectedNews.image_url || IMAGES.news1} 
-                  alt={selectedNews.title}
-                  className="w-full h-full object-cover"
-                  referrerPolicy="no-referrer"
-                />
-                <div className="absolute top-6 left-6">
-                  <span className="px-4 py-2 bg-primary text-white text-xs font-bold rounded-full uppercase tracking-wider shadow-lg">
-                    {selectedNews.category}
-                  </span>
+            <article className="bg-white rounded-[40px] overflow-hidden shadow-2xl shadow-primary/5 border border-primary/5 max-w-4xl mx-auto">
+              <div className="relative bg-surface-container-low p-4 sm:p-6 md:p-8 flex items-center justify-center overflow-hidden border-b border-primary/5">
+                <div className="relative w-full max-w-md aspect-[4/5] rounded-3xl overflow-hidden shadow-xl border border-primary/10 bg-white">
+                  <img 
+                    src={selectedNews.image_url || IMAGES.news1} 
+                    alt={selectedNews.title}
+                    className="w-full h-full object-cover object-center"
+                    referrerPolicy="no-referrer"
+                  />
+                  <div className="absolute top-4 left-4">
+                    <span className="px-4 py-2 bg-primary text-white text-xs font-bold rounded-full uppercase tracking-wider shadow-lg">
+                      {selectedNews.category}
+                    </span>
+                  </div>
                 </div>
               </div>
               
@@ -2554,25 +2645,52 @@ export default function App() {
                             </select>
                           </div>
                           <div>
-                            <label className="block text-[10px] font-bold text-secondary uppercase tracking-widest mb-1.5 ml-1">Imagem da Notícia</label>
+                            <label className="block text-[10px] font-bold text-secondary uppercase tracking-widest mb-1.5 ml-1">
+                              Imagem da Notícia (Padrão: 1080 x 1350 px)
+                            </label>
                             <div className="relative">
                               <input 
                                 type="file" 
                                 accept="image/*"
-                                onChange={(e) => setNewImageFile(e.target.files ? e.target.files[0] : null)}
+                                onChange={handleNewsImageChange}
                                 className="hidden"
                                 id="news-image-upload"
                               />
                               <label 
                                 htmlFor="news-image-upload"
-                                className="w-full flex items-center justify-between bg-surface-container-low border-2 border-dashed border-primary/10 rounded-2xl px-4 py-3 text-sm cursor-pointer hover:bg-primary/5 transition-all"
+                                className="w-full flex items-center justify-between bg-surface-container-low border-2 border-dashed border-primary/20 rounded-2xl px-4 py-3 text-sm cursor-pointer hover:bg-primary/5 transition-all"
                               >
-                                <span className="text-secondary truncate">
-                                  {newImageFile ? newImageFile.name : 'Selecionar imagem...'}
+                                <span className="text-secondary truncate text-xs">
+                                  {newImageFile ? newImageFile.name : (newImageUrl ? 'Imagem atual mantida' : 'Selecionar imagem (1080 x 1350)...')}
                                 </span>
                                 <Image className="w-4 h-4 text-primary" />
                               </label>
                             </div>
+                            <div className="flex items-center justify-between mt-1 px-1">
+                              <span className="text-[10px] text-primary/80 font-bold">
+                                Formato: 1080 x 1350 px (proporção vertical 4:5)
+                              </span>
+                              {(newImageFile || newImageUrl) && (
+                                <span className="text-[9px] text-primary font-bold bg-primary/10 px-2 py-0.5 rounded-full">
+                                  1080 x 1350
+                                </span>
+                              )}
+                            </div>
+                            {(newImageFile || newImageUrl) && (
+                              <div className="mt-2.5 flex items-center gap-3 p-2.5 bg-surface-container-low rounded-2xl border border-primary/10">
+                                <div className="w-12 aspect-[4/5] rounded-lg overflow-hidden shadow-sm border border-primary/20 shrink-0 bg-white">
+                                  <img 
+                                    src={newImageFile ? URL.createObjectURL(newImageFile) : newImageUrl} 
+                                    alt="Pré-visualização 1080x1350"
+                                    className="w-full h-full object-cover object-center"
+                                  />
+                                </div>
+                                <div className="text-[11px] leading-tight">
+                                  <span className="font-bold text-primary block">Prévia Padronizada</span>
+                                  <span className="text-[10px] text-secondary">A imagem será salva na proporção 1080 x 1350 px.</span>
+                                </div>
+                              </div>
+                            )}
                           </div>
                         </div>
 
@@ -2645,7 +2763,9 @@ export default function App() {
                       <div className="space-y-4">
                         {newsList.map((news) => (
                           <div key={news.id} className="bg-surface-container-low p-4 rounded-2xl flex items-center gap-4 border border-primary/5 group">
-                            <img src={news.image_url} alt="" className="w-16 h-16 rounded-xl object-cover shadow-sm" referrerPolicy="no-referrer" />
+                            <div className="w-12 aspect-[4/5] rounded-xl overflow-hidden shadow-sm shrink-0 bg-surface-container-high border border-primary/10">
+                              <img src={news.image_url} alt="" className="w-full h-full object-cover object-center" referrerPolicy="no-referrer" />
+                            </div>
                             <div className="flex-1 min-w-0">
                               <h4 className="font-bold text-on-surface truncate">{news.title}</h4>
                               <p className="text-[10px] text-secondary uppercase tracking-widest mt-1">
