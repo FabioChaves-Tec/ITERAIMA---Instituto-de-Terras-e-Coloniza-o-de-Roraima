@@ -1189,7 +1189,7 @@ export default function App() {
   const legislacaoItems = mapMenuNodesToAppItems(legislacaoNodes);
 
   return (
-    <div className="min-h-screen bg-background text-on-surface font-body pb-24">
+    <div className="min-h-screen bg-background text-on-surface font-body pb-24 overflow-x-hidden w-full max-w-full">
         {/* Painel de Acessibilidade */}
         <AccessibilityPanel onPageChange={setCurrentPage} />
 

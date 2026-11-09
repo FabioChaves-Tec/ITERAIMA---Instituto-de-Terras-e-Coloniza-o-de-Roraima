@@ -22,8 +22,8 @@
 }
 
 @layer base {
-  body {
-    @apply bg-background text-on-surface font-body;
+  html, body {
+    @apply bg-background text-on-surface font-body overflow-x-hidden max-w-full;
   }
 }
 

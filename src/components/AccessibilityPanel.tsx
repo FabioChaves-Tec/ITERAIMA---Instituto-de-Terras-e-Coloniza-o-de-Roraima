@@ -331,10 +331,10 @@ export function AccessibilityPanel({ onPageChange }: AccessibilityPanelProps) {
   return (
     <div id="acc-section" className="relative">
       
-      {/* 1. TOP STATS BAR INTEGRATION (e-MAG Compliant accessibility shortcut links) */}
+      {/* 1. TOP STATS BAR INTEGRATION (e-MAG Compliant accessibility shortcut links - Visible only on Desktop/Computer) */}
       <div 
         id="acc-top-shortcut-bar" 
-        className="w-full bg-[#002202] text-white/95 text-[10px] font-bold px-6 py-2 flex flex-wrap items-center justify-between gap-4 border-b border-white/5 relative z-50 shadow-sm"
+        className="hidden md:flex w-full bg-[#002202] text-white/95 text-[10px] font-bold px-6 py-2 items-center justify-between gap-4 border-b border-white/5 relative z-50 shadow-sm overflow-x-hidden"
       >
         <div id="acc-shortcuts-legend" className="flex items-center gap-4">
           <span className="text-[#bfdfc4] font-black uppercase tracking-wider">Atalhos do Portal:</span>
